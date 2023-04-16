@@ -10,6 +10,8 @@ dependencies:
   # path: ^1.8.0
   nyxx: ^5.0.3
   nyxx_commands: ^5.0.2
+  nyxx_interactions: ^4.6.0
+  hydrated_bloc: ^9.1.0
 
 dev_dependencies:
   lints: ^2.0.0
