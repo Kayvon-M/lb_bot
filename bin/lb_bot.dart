@@ -34,10 +34,11 @@ Future<void> main() async {
   commands.addCommand(ping);
   commands.addCommand(eloTest);
   commands.addCommand(lbAddUser);
+  commands.addCommand(lbRemoveUser);
 
-  // IInteractions.create(WebsocketInteractionBackend(bot))
-  //   ..registerSlashCommand(lbAddUser)
-  //   ..syncOnReady();
+  IInteractions.create(WebsocketInteractionBackend(bot))
+    ..registerSlashCommand(lbListAllUsers)
+    ..syncOnReady();
 
   bot.connect();
 

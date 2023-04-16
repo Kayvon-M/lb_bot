@@ -3,6 +3,7 @@ import 'package:nyxx/nyxx.dart';
 enum Leaderboards {
   mw2,
   bo2,
+  mwii,
 }
 
 String leaderboardToString(Leaderboards leaderboard) {
@@ -11,6 +12,8 @@ String leaderboardToString(Leaderboards leaderboard) {
       return 'mw2';
     case Leaderboards.bo2:
       return 'bo2';
+    case Leaderboards.mwii:
+      return 'mwii';
   }
 }
 
@@ -20,6 +23,8 @@ Leaderboards stringToLeaderboard(String leaderboard) {
       return Leaderboards.mw2;
     case 'bo2':
       return Leaderboards.bo2;
+    case 'mwii':
+      return Leaderboards.mwii;
     default:
       throw Exception('Invalid leaderboard string');
   }

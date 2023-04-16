@@ -12,9 +12,11 @@ class LBUsersCubit extends HydratedCubit<List<LBUserModel>> {
     emit(state);
   }
 
-  void removeUser(Snowflake id) {
+  String removeUser(Snowflake id) {
+    String username = state.firstWhere((user) => user.id == id).name;
     state.removeWhere((user) => user.id == id);
     emit(state);
+    return username;
   }
 
   void updateUser(LBUserModel user) {
