@@ -1,7 +1,7 @@
 import 'dart:math';
 
 class EloCalculator {
-  static const double k = 32.0;
+  static const double k = 75.0;
 
   static double expectedScore(double rating1, double rating2) {
     return 1.0 / (1.0 + pow(10.0, (rating2 - rating1) / 400.0));
