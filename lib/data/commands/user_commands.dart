@@ -295,8 +295,28 @@ final lbRemoveLeaderboard = SlashCommandBuilder(
     }
   });
 
-final lbListAllUsers =
-    SlashCommandBuilder("lb-list-users", "List all users in a leaderboard", [
+ChatCommand lbListAllUsers = ChatCommand(
+  "lb-list-all-users",
+  "Lists all users in the leaderboard",
+  (IChatContext context) {
+    try {
+      List<LBUserModel> users = lbUsersCubit.users;
+      String message = "Users in the leaderboard: ${users.length}\n";
+      if (users.isEmpty) {
+        message += "\tNo users in the leaderboard";
+      }
+      for (var user in users) {
+        message += "\t${user.name} - ${user.id}\n";
+      }
+      context.respond(MessageBuilder.content(message));
+    } catch (e) {
+      context.respond(MessageBuilder.content("Error: $e"));
+    }
+  },
+);
+
+final lbListLBUsers = SlashCommandBuilder(
+    "lb-list-leaderboard", "List all users in a leaderboard", [
   CommandOptionBuilder(
       CommandOptionType.string, "leaderboard", "Leaderboard to list users from",
       required: true,
@@ -305,27 +325,32 @@ final lbListAllUsers =
         ArgChoiceBuilder("BO2", "bo2"),
       ]),
 ])
-      ..registerHandler((event) async {
-        final leaderboard = event.getArg("leaderboard").value as String;
-        List<LBUserModel> users = [];
-        UserLogic userLogic = UserLogic();
-        if (leaderboard == "mw2") {
-          try {
-            users = userLogic.sortUsersByMw2Rating(lbUsersCubit.users);
-          } catch (e) {
-            event.respond(MessageBuilder.content("Error: $e"));
-          }
-        } else if (leaderboard == "bo2") {
-          try {
-            users = userLogic.sortUsersByBo2Rating(lbUsersCubit.users);
-          } catch (e) {
-            event.respond(MessageBuilder.content("Error: $e"));
-          }
-        }
-        String usersString = users
-            .map((e) => leaderboard == "mw2"
-                ? "${e.name} - ${e.mw2Rating}"
-                : "${e.name} - ${e.bo2Rating}")
-            .join("\n");
-        await event.respond(MessageBuilder.content(usersString));
-      });
+  ..registerHandler((event) async {
+    final leaderboard = event.getArg("leaderboard").value as String;
+    List<LBUserModel> users = [];
+    UserLogic userLogic = UserLogic();
+    if (leaderboard == "mw2") {
+      try {
+        users = userLogic.sortUsersByMw2Rating(lbUsersCubit.users);
+      } catch (e) {
+        event.respond(MessageBuilder.content("Error: $e"));
+      }
+    } else if (leaderboard == "bo2") {
+      try {
+        users = userLogic.sortUsersByBo2Rating(lbUsersCubit.users);
+      } catch (e) {
+        event.respond(MessageBuilder.content("Error: $e"));
+      }
+    }
+    String usersString = users
+        .map((e) => leaderboard == "mw2"
+            ? "${e.name} - ${e.mw2Rating}"
+            : "${e.name} - ${e.bo2Rating}")
+        .join("\n");
+    print(users.length.toString());
+    if (users.isNotEmpty) {
+      await event.respond(MessageBuilder.content(usersString));
+    } else {
+      await event.respond(MessageBuilder.content("No users in leaderboard"));
+    }
+  });

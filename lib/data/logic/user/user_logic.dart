@@ -8,7 +8,7 @@ class UserLogic {
   List<LBUserModel> sortUsersByMw2Rating(List<LBUserModel> users) {
     List<LBUserModel> sortedUsers = [];
     for (var user in users) {
-      if (user.mw2Rating != null) {
+      if (user.mw2Rating != null && user.isBanned == false) {
         sortedUsers.add(user);
       }
     }
@@ -19,7 +19,7 @@ class UserLogic {
   List<LBUserModel> sortUsersByBo2Rating(List<LBUserModel> users) {
     List<LBUserModel> sortedUsers = [];
     for (var user in users) {
-      if (user.bo2Rating != null) {
+      if (user.bo2Rating != null && user.isBanned == false) {
         sortedUsers.add(user);
       }
     }

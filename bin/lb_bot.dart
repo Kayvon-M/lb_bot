@@ -43,9 +43,10 @@ Future<void> main() async {
   commands.addCommand(lbPromoteUser);
   commands.addCommand(lbDemoteUser);
   commands.addCommand(lbIsUserModerator);
+  commands.addCommand(lbListAllUsers);
 
   IInteractions.create(WebsocketInteractionBackend(bot))
-    ..registerSlashCommand(lbListAllUsers)
+    ..registerSlashCommand(lbListLBUsers)
     ..registerSlashCommand(lbAddLeaderboard)
     ..registerSlashCommand(lbRemoveLeaderboard)
     ..syncOnReady();
