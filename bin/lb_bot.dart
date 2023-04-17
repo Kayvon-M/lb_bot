@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:lb_bot/core/utils/elo/elo_calculator.dart';
-import 'package:lb_bot/data/commands/commands.dart';
+import 'package:lb_bot/data/commands/user_commands.dart';
 import 'package:lb_bot/secrets/secrets.dart';
 import 'package:nyxx/nyxx.dart';
 import 'package:nyxx_commands/nyxx_commands.dart';
@@ -19,8 +19,8 @@ Future<void> main() async {
     ..registerPlugin(Logging()) // Default logging plugin
     ..registerPlugin(
         CliIntegration()) // Cli integration for nyxx allows stopping application via SIGTERM and SIGKILl
-    ..registerPlugin(
-        IgnoreExceptions()); // Plugin that handles uncaught exceptions that may occur
+    ..registerPlugin(IgnoreExceptions());
+  // Plugin that handles uncaught exceptions that may occur
 
   CommandsPlugin commands = CommandsPlugin(
       prefix: (message) => "/", // Prefix for commands
@@ -34,10 +34,21 @@ Future<void> main() async {
   commands.addCommand(ping);
   commands.addCommand(eloTest);
   commands.addCommand(lbAddUser);
+  commands.addCommand(lbRemoveUser);
+  commands.addCommand(lbUpdateUserName);
+  commands.addCommand(lbFindUser);
+  commands.addCommand(lbBanUser);
+  commands.addCommand(lbUnbanUser);
+  commands.addCommand(lbIsUserBanned);
+  commands.addCommand(lbPromoteUser);
+  commands.addCommand(lbDemoteUser);
+  commands.addCommand(lbIsUserModerator);
 
-  // IInteractions.create(WebsocketInteractionBackend(bot))
-  //   ..registerSlashCommand(lbAddUser)
-  //   ..syncOnReady();
+  IInteractions.create(WebsocketInteractionBackend(bot))
+    ..registerSlashCommand(lbListAllUsers)
+    ..registerSlashCommand(lbAddLeaderboard)
+    ..registerSlashCommand(lbRemoveLeaderboard)
+    ..syncOnReady();
 
   bot.connect();
 

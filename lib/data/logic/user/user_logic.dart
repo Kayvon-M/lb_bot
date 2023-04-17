@@ -6,25 +6,25 @@ class UserLogic {
   static const int _ranksAbleToChallengeBelow = 2;
 
   List<LBUserModel> sortUsersByMw2Rating(List<LBUserModel> users) {
-    var sortedUsers = [];
+    List<LBUserModel> sortedUsers = [];
     for (var user in users) {
       if (user.mw2Rating != null) {
         sortedUsers.add(user);
       }
     }
-    sortedUsers.sort((a, b) => b.mw2Rating.compareTo(a.mw2Rating));
-    return users;
+    sortedUsers.sort((a, b) => b.mw2Rating!.compareTo(a.mw2Rating!));
+    return sortedUsers;
   }
 
   List<LBUserModel> sortUsersByBo2Rating(List<LBUserModel> users) {
-    var sortedUsers = [];
+    List<LBUserModel> sortedUsers = [];
     for (var user in users) {
       if (user.bo2Rating != null) {
         sortedUsers.add(user);
       }
     }
-    sortedUsers.sort((a, b) => b.bo2Rating.compareTo(a.bo2Rating));
-    return users;
+    sortedUsers.sort((a, b) => b.bo2Rating!.compareTo(a.bo2Rating!));
+    return sortedUsers;
   }
 
   bool canChallenge(LBUserModel challenger, LBUserModel challenged,

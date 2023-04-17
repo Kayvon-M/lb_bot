@@ -12,45 +12,83 @@ class LBUsersCubit extends HydratedCubit<List<LBUserModel>> {
     emit(state);
   }
 
-  void removeUser(Snowflake id) {
+  String removeUser(Snowflake id) {
+    String username = state.firstWhere((user) => user.id == id).name;
     state.removeWhere((user) => user.id == id);
     emit(state);
+    return username;
   }
 
-  void updateUser(LBUserModel user) {
-    state.removeWhere((u) => u.id == user.id);
-    state.add(user);
+  String updateUserName(Snowflake id, String newName) {
+    String oldName = state.firstWhere((user) => user.id == id).name;
+    state.firstWhere((user) => user.id == id).name = newName;
     emit(state);
+    return oldName;
   }
 
-  void banUser(Snowflake id) {
+  LBUserModel getUser(Snowflake id) {
+    return state.firstWhere((user) => user.id == id);
+  }
+
+  String banUser(Snowflake id) {
+    String username = state.firstWhere((user) => user.id == id).name;
     state.firstWhere((user) => user.id == id).isBanned = true;
     emit(state);
+    return username;
   }
 
-  void unbanUser(Snowflake id) {
+  String unbanUser(Snowflake id) {
+    String username = state.firstWhere((user) => user.id == id).name;
     state.firstWhere((user) => user.id == id).isBanned = false;
     emit(state);
+    return username;
   }
 
-  void promoteUser(Snowflake id) {
+  bool isUserBanned(Snowflake id) {
+    return state.firstWhere((user) => user.id == id).isBanned;
+  }
+
+  String promoteUser(Snowflake id) {
+    String username = state.firstWhere((user) => user.id == id).name;
     state.firstWhere((user) => user.id == id).isModerator = true;
     emit(state);
+    return username;
   }
 
-  void demoteUser(Snowflake id) {
+  String demoteUser(Snowflake id) {
+    String username = state.firstWhere((user) => user.id == id).name;
     state.firstWhere((user) => user.id == id).isModerator = false;
     emit(state);
+    return username;
   }
 
-  void addLeaderboard(Snowflake id, Leaderboards leaderboard) {
+  bool isUserModerator(Snowflake id) {
+    return state.firstWhere((user) => user.id == id).isModerator;
+  }
+
+  String addLeaderboard(Snowflake id, Leaderboards leaderboard) {
+    String username = state.firstWhere((user) => user.id == id).name;
     state.firstWhere((user) => user.id == id).leaderboards.add(leaderboard);
+    if (leaderboard == Leaderboards.mw2) {
+      state.firstWhere((user) => user.id == id).mw2Rating = 500;
+    } else if (leaderboard == Leaderboards.bo2) {
+      state.firstWhere((user) => user.id == id).bo2Rating = 500;
+    }
     emit(state);
+    return username;
   }
 
-  void removeLeaderboard(Snowflake id, Leaderboards leaderboard) {
+  String removeLeaderboard(Snowflake id, Leaderboards leaderboard) {
+    String username = state.firstWhere((user) => user.id == id).name;
     state.firstWhere((user) => user.id == id).leaderboards.remove(leaderboard);
+    if (leaderboard == Leaderboards.mw2) {
+      state.firstWhere((user) => user.id == id).mw2Rating = null;
+    } else if (leaderboard == Leaderboards.bo2) {
+      state.firstWhere((user) => user.id == id).bo2Rating = null;
+    }
+    state.firstWhere((user) => user.id == id);
     emit(state);
+    return username;
   }
 
   void changePlayerRating(
