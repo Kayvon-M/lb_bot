@@ -7,3 +7,7 @@ def getNowAsStr():
 
 def dateStrToDateTime(dateStr):
     return datetime.datetime.strptime(dateStr, "%Y-%m-%d %H:%M:%S")
+
+
+def dateTimeToDateStr(dateTime):
+    return dateTime.strftime("%Y-%m-%d %H:%M:%S")

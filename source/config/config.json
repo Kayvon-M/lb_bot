@@ -3,5 +3,11 @@
   "guildId": 1096522707002196028,
   "activeChannelId": 1096523042248736798,
   "kFactor": 75,
-  "prefix": "/"
+  "prefix": "/",
+  "challengeSettings": {
+    "maxActiveMandatoryChallenges": 2,
+    "defaultChallengeExpirationDays": 3,
+    "maxChallengeRanksAboveForMandatory": 4,
+    "maxChallengeRanksBelowForMandatory": 2
+  }
 }

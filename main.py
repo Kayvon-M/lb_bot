@@ -5,7 +5,8 @@ import json
 from discord import app_commands
 
 from source.core.utils.elo_utils import getNewRatings
-from source.data.models.base_models import LBModeratorModel, LBUserModel
+from source.data.api.lb.lb_api import LBApi
+from source.data.models.base_models import ChallengeModel, LBModeratorModel, LBUserModel
 from source.data.models.services.tinydb.tinydb_service import TinyDBService
 from source.core.utils.time_utils import getNowAsStr
 
@@ -22,6 +23,7 @@ tree = app_commands.CommandTree(client)
 
 # Initialize tinydb
 dbService = TinyDBService()
+lbApi = LBApi()
 
 print(dbService.getLeaderboardUsers())
 
@@ -70,25 +72,75 @@ async def add_lb_user(ctx, user: discord.User, username: str, mw2: app_commands.
         leadebords.append("bo2")
     if mwii.value == 1:
         leadebords.append("mwii")
-    user = LBUserModel(
-        id=user.id,
-        username=username,
-        isBanned=False,
-        isModerator=False,
-        leaderboards=leadebords,
-        joinDate=getNowAsStr(),
-        lastActiveDate=getNowAsStr(),
-        mw2Elo=500 if mw2.value == 1 else None,
-        bo2Elo=500 if bo2.value == 1 else None,
-        mwiiElo=500 if mwii.value == 1 else None,
-        matchHistory=[],
-        activeChallenges=[],
-        pendingChallenges=[],
-        challengeHistory=[],
-        moderationHistory=[],
-    )
-    dbService.addLeaderboardUser(user)
-    await ctx.response.send_message(content="Added " + str(user) + " to the database.")
+    users = dbService.getLeaderboardUsers()
+    if list(filter(lambda user: user.id == user.id, users)) == []:
+        user = LBUserModel(
+            id=user.id,
+            username=username,
+            isBanned=False,
+            isModerator=False,
+            leaderboards=leadebords,
+            joinDate=getNowAsStr(),
+            lastActiveDate=getNowAsStr(),
+            mw2Elo=500 if mw2.value == 1 else None,
+            bo2Elo=500 if bo2.value == 1 else None,
+            mwiiElo=500 if mwii.value == 1 else None,
+            matchHistory=[],
+            activeChallenges=[],
+            pendingChallenges=[],
+            challengeHistory=[],
+            moderationHistory=[],
+        )
+        dbService.addLeaderboardUser(user)
+        await ctx.response.send_message(content="Added " + str(user) + " to the database.")
+    else:
+        await ctx.response.send_message(content="User already exists in the database.")
+
+
+@tree.command(name="lb-register", description="Register for Leaderboard(s)", guild=discord.Object(id=config['guildId']))
+@app_commands.choices(mw2=[
+    app_commands.Choice(name="Playing", value=1),
+    app_commands.Choice(name="Not Playing", value=0)
+])
+@app_commands.choices(bo2=[
+    app_commands.Choice(name="Playing", value=1),
+    app_commands.Choice(name="Not Playing", value=0)
+])
+@app_commands.choices(mwii=[
+    app_commands.Choice(name="Playing", value=1),
+    app_commands.Choice(name="Not Playing", value=0)
+])
+async def lb_register(ctx, username: str, mw2: app_commands.Choice[int], bo2: app_commands.Choice[int], mwii: app_commands.Choice[int]):
+    leadebords = []
+    if mw2.value == 1:
+        leadebords.append("mw2")
+    if bo2.value == 1:
+        leadebords.append("bo2")
+    if mwii.value == 1:
+        leadebords.append("mwii")
+    userFound = dbService.getLeaderboardUser(ctx.user.id)
+    if userFound is None:
+        user = LBUserModel(
+            id=ctx.user.id,
+            username=username,
+            isBanned=False,
+            isModerator=False,
+            leaderboards=leadebords,
+            joinDate=getNowAsStr(),
+            lastActiveDate=getNowAsStr(),
+            mw2Elo=500 if mw2.value == 1 else None,
+            bo2Elo=500 if bo2.value == 1 else None,
+            mwiiElo=500 if mwii.value == 1 else None,
+            matchHistory=[],
+            activeChallenges=[],
+            pendingChallenges=[],
+            challengeHistory=[],
+            moderationHistory=[],
+        )
+        dbService.addLeaderboardUser(user)
+        await ctx.response.send_message(content="Added " + str(user) + " to the database.")
+    else:
+        await ctx.response.send_message(content="You are already registered.")
 
 
 @tree.command(name="get-lb-user", description="Get Player from a Leaderboard.", guild=discord.Object(id=config['guildId']))
@@ -116,6 +168,133 @@ async def list_lb_users(ctx):
         await ctx.response.send_message(content=str(usersString))
     else:
         await ctx.response.send_message(content="Could not find any players.")
+
+
+@tree.command(name="list-users-lb", description="List a Leaderboard's Users.", guild=discord.Object(id=config['guildId']))
+@app_commands.choices(leaderboard=[
+    app_commands.Choice(name="MW2", value="mw2"),
+    app_commands.Choice(name="BO2", value="bo2"),
+    app_commands.Choice(name="MWII", value="mwii")
+])
+async def list_users_lb(ctx, leaderboard: app_commands.Choice[str]):
+    usersString = dbService.getLeaderboardUsersByLeaderboard(leaderboard.value)
+    if usersString != "":
+        await ctx.response.send_message(content=str(usersString))
+    else:
+        await ctx.response.send_message(content="Could not find any players.")
+
+
+@tree.command(name="get-num-lb-users", description="Get Number of Leaderboard Users.", guild=discord.Object(id=config['guildId']))
+async def get_num_lb_users(ctx):
+    numUsers = dbService.getLeaderboardUserCount()
+    await ctx.response.send_message(content="There are " + str(numUsers) + " lb users in the database.")
+
+
+@tree.command(name="get-lb-num-users", description="Get Number of Leaderboard Users.", guild=discord.Object(id=config['guildId']))
+@app_commands.choices(leaderboard=[
+    app_commands.Choice(name="MW2", value="mw2"),
+    app_commands.Choice(name="BO2", value="bo2"),
+    app_commands.Choice(name="MWII", value="mwii")
+])
+async def get_lb_num_users(ctx, leaderboard: app_commands.Choice[str]):
+    numUsers = dbService.getLeaderboardUserCountByLeaderboard(
+        leaderboard.value)
+    await ctx.response.send_message(content="There are " + str(numUsers) + " " + leaderboard.value + " lb users in the database.")
+
+
+@tree.command(name="get-lb-user-pending", description="Get Player's Pending Challenges.", guild=discord.Object(id=config['guildId']))
+async def get_lb_user_pending(ctx, user: discord.User):
+    try:
+        pendingChallenges = dbService.getLeaderboardUserPendingChallenges(
+            user.id)
+        pendingChallengesObjs = []
+        for challenge in pendingChallenges:
+            challengeObj = ChallengeModel(
+                id=challenge["id"],
+                challengeTime=challenge["challengeTime"],
+                challenger=LBUserModel(
+                    id=challenge["challenger"]['id'],
+                    username=challenge["challenger"]['username'],
+                    isBanned=challenge["challenger"]['isBanned'],
+                    isModerator=challenge["challenger"]['isModerator'],
+                    leaderboards=challenge["challenger"]['leaderboards'],
+                    joinDate=challenge["challenger"]['joinDate'],
+                    lastActiveDate=challenge["challenger"]['lastActiveDate'],
+                    mw2Elo=challenge["challenger"]['mw2Elo'],
+                    bo2Elo=challenge["challenger"]['bo2Elo'],
+                    mwiiElo=challenge["challenger"]['mwiiElo'],
+                    matchHistory=challenge["challenger"]['matchHistory'],
+                    activeChallenges=challenge["challenger"]['activeChallenges'],
+                    pendingChallenges=challenge["challenger"]['pendingChallenges'],
+                    challengeHistory=challenge["challenger"]['challengeHistory'],
+                    moderationHistory=challenge["challenger"]['moderationHistory'],
+                ),
+                challenged=LBUserModel(
+                    id=challenge["challenged"]['id'],
+                    username=challenge["challenged"]['username'],
+                    isBanned=challenge["challenged"]['isBanned'],
+                    isModerator=challenge["challenged"]['isModerator'],
+                    leaderboards=challenge["challenged"]['leaderboards'],
+                    joinDate=challenge["challenged"]['joinDate'],
+                    lastActiveDate=challenge["challenged"]['lastActiveDate'],
+                    mw2Elo=challenge["challenged"]['mw2Elo'],
+                    bo2Elo=challenge["challenged"]['bo2Elo'],
+                    mwiiElo=challenge["challenged"]['mwiiElo'],
+                    matchHistory=challenge["challenged"]['matchHistory'],
+                    activeChallenges=challenge["challenged"]['activeChallenges'],
+                    pendingChallenges=challenge["challenged"]['pendingChallenges'],
+                    challengeHistory=challenge["challenged"]['challengeHistory'],
+                    moderationHistory=challenge["challenged"]['moderationHistory'],
+                ),
+                leaderboard=challenge["leaderboard"],
+                isAccepted=challenge["isAccepted"],
+                isMandatory=challenge["isMandatory"],
+                expiryTime=challenge["expiryTime"],
+                result=challenge["result"],
+            )
+            pendingChallengesObjs.append(challengeObj)
+        if len(pendingChallengesObjs) == 0:
+            raise Exception("No pending challenges found.")
+        await ctx.response.send_message(content="\n".join([f"Found {str(challenge)}" for challenge in pendingChallengesObjs]))
+    except Exception as e:
+        await ctx.response.send_message(content="Could not find any pending challenges for " + str(user) + ".\nReason: " + str(e))
+    # await ctx.response.send_message(content="Found:\n" + "\n".join([f"\t{str(challenge)}" for challenge in pendingChallenges]))
+
+
+@tree.command(name="lb-challenge", description="Challenge a Player from a Leaderboard.", guild=discord.Object(id=config['guildId']))
+@app_commands.choices(leaderboard=[
+    app_commands.Choice(name="MW2", value="mw2"),
+    app_commands.Choice(name="BO2", value="bo2"),
+    app_commands.Choice(name="MWII", value="mwii")
+])
+async def lb_challenge(ctx, challenged: discord.User, leaderboard: app_commands.Choice[str]):
+    try:
+        challenge = lbApi.challengeLBUser(
+            ctx.user.id, challenged.id, leaderboard.value)
+        await ctx.response.send_message(content="Challenge created: " + str(challenge))
+    except Exception as e:
+        await ctx.response.send_message(content="Could not create challenge.\nReason: " + str(e))
+
+
+@tree.command(name="lb-rm-challenge", description="Remove a Challenge from a user's pending challenges.", guild=discord.Object(id=config['guildId']))
+async def lb_rm_challenge(ctx, user: discord.User, cid: str):
+    try:
+        newChallengeId = int(cid)
+        challenge = lbApi.removeChallengeFromLBUserPendingChallenges(
+            user.id, newChallengeId)
+        await ctx.response.send_message(content="Challenge removed: " + challenge)
+    except Exception as e:
+        await ctx.response.send_message(content="Could not remove challenge.\nReason: " + str(e))
+
+
+@tree.command(name="lb-rm-all-challenges", description="Remove all Challenges from a user's pending challenges.", guild=discord.Object(id=config['guildId']))
+async def lb_rm_all_challenges(ctx, user: discord.User):
+    try:
+        challenges = lbApi.removeAllChallengesFromLBUserPendingChallenges(
+            user.id)
+        await ctx.response.send_message(content="Challenges removed: " + str(challenges))
+    except Exception as e:
+        await ctx.response.send_message(content="Could not remove challenges.\nReason: " + str(e))
 
 
 @tree.command(name="add-mod-user", description="Add Moderator User.", guild=discord.Object(id=config['guildId']))
