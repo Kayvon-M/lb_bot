@@ -68,35 +68,12 @@ class LBUserModel(BaseUserModel):
             "mw2Elo": self.mw2Elo,
             "bo2Elo": self.bo2Elo,
             "mwiiElo": self.mwiiElo,
-            "matchHistory": list(map(lambda x: x.toJSON(), self.matchHistory)),
-            "activeChallenges": list(map(lambda x: x.toJSON(), self.activeChallenges)),
-            "pendingChallenges": list(map(lambda x: x.toJSON(), self.pendingChallenges)),
-            "challengeHistory": list(map(lambda x: x.toJSON(), self.challengeHistory)),
-            "moderationHistory": list(map(lambda x: x.toJSON(), self.moderationHistory))
+            "matchHistory": self.matchHistory,
+            "activeChallenges": self.activeChallenges,
+            "pendingChallenges": self.pendingChallenges,
+            "challengeHistory": self.challengeHistory,
+            "moderationHistory": self.moderationHistory,
         }
-
-    def fromJSON(self, json):
-        self.id = json["id"]
-        self.username = json["username"]
-        self.isBanned = json["isBanned"]
-        self.isModerator = json["isModerator"]
-        self.leaderboards = json["leaderboards"]
-        self.joinDate = json["joinDate"]
-        self.lastActiveDate = json["lastActiveDate"]
-        self.mw2Elo = json["mw2Elo"]
-        self.bo2Elo = json["bo2Elo"]
-        self.mwiiElo = json["mwiiElo"]
-        self.matchHistory = list(map(
-            lambda x: ChallengeResultModel().fromJSON(x), json["matchHistory"]))
-        self.activeChallenges = list(map(
-            lambda x: ChallengeModel().fromJSON(x), json["activeChallenges"]))
-        self.pendingChallenges = list(map(
-            lambda x: ChallengeModel().fromJSON(x), json["pendingChallenges"]))
-        self.challengeHistory = list(map(
-            lambda x: ChallengeModel().fromJSON(x), json["challengeHistory"]))
-        self.moderationHistory = list(map(
-            lambda x: ModerationActionModel().fromJSON(x), json["moderationHistory"]))
-        return self
 
 
 ModerationActions = {
@@ -191,16 +168,10 @@ class ChallengeResultModel(object):
             "resultTime": self.resultTime
         }
 
-    def fromJSON(self, json):
-        self.challenger = LBUserModel(json["challenger"])
-        self.challenged = LBUserModel(json["challenged"])
-        self.leaderboard = json["leaderboard"]
-        self.result = json["result"]
-        self.resultTime = json["resultTime"]
-
 
 class ChallengeModel(object):
-    def __init__(self, challengeTime, challenger, challenged, leaderboard, isAccepted, isMandatory, expiryTime, result):
+    def __init__(self, id, challengeTime, challenger, challenged, leaderboard, isAccepted, isMandatory, expiryTime, result):
+        self.id = id
         self.challengeTime = challengeTime
         self.challenger = challenger
         self.challenged = challenged
@@ -211,10 +182,14 @@ class ChallengeModel(object):
         self.result = result
 
     def __str__(self):
-        return "Challenge: " + self.challenger + " challenged " + self.challenged + " on " + self.leaderboard + " at " + self.challengeTime + " and expires at " + self.expiryTime
+        if self.isMandatory:
+            return f"Mandatory challenge with id {str(self.id)}: " + str(self.challenger) + " challenged " + str(self.challenged) + " on " + self.leaderboard + " at " + self.challengeTime + " and expires at " + self.expiryTime
+        return f"Challenge with id {str(self.id)}: " + str(self.challenger) + " challenged " + str(self.challenged) + " on " + self.leaderboard + " at " + self.challengeTime + " and expires at " + self.expiryTime
 
     def __repr__(self):
-        return "Challenge: " + self.challenger + " challenged " + self.challenged + " on " + self.leaderboard + " at " + self.challengeTime + " and expires at " + self.expiryTime
+        if self.isMandatory:
+            return f"Mandatory challenge with id {str(self.id)}: " + str(self.challenger) + " challenged " + str(self.challenged) + " on " + self.leaderboard + " at " + self.challengeTime + " and expires at " + self.expiryTime
+        return f"Challenge with id {str(self.id)}: " + str(self.challenger) + " challenged " + str(self.challenged) + " on " + self.leaderboard + " at " + self.challengeTime + " and expires at " + self.expiryTime
 
     def isChallengeExpired(self):
         return datetime.datetime.now() > self.expiryTime
@@ -247,23 +222,72 @@ class ChallengeModel(object):
 
     def toJSON(self):
         return {
+            "id": self.id,
             "challengeTime": self.challengeTime,
-            "challenger": LBUserModel(self.challenger).toJSON(),
-            "challenged": LBUserModel(self.challenged).toJSON(),
+            "challenger": self.challenger.toJSON(),
+            "challenged": self.challenged.toJSON(),
             "leaderboard": self.leaderboard,
             "isAccepted": self.isAccepted,
             "isMandatory": self.isMandatory,
             "expiryTime": self.expiryTime,
-            "result": ChallengePossibleOutcomes[self.result].toJSON()
+            "result": None if self.result is None else self.result.toJSON()
         }
 
-    def fromJSON(self, json):
-        self.challengeTime = json["challengeTime"]
-        self.challenger = LBUserModel(json["challenger"])
-        self.challenged = LBUserModel(json["challenged"])
-        self.leaderboard = json["leaderboard"]
-        self.isAccepted = json["isAccepted"]
-        self.isMandatory = json["isMandatory"]
-        self.expiryTime = json["expiryTime"]
-        self.result = ChallengePossibleOutcomes[json["result"]]
-        return self
+
+def ModerationActionModelFromJSON(json):
+    return ModerationActionModel(
+        json["action"],
+        json["moderator"],
+        json["target"],
+        json["reason"],
+        json["actionTime"]
+    )
+
+
+def ChallengeResultModelFromJSON(self, json):
+    return ChallengeResultModel(
+        json["challenger"],
+        json["challenged"],
+        json["leaderboard"],
+        json["result"],
+        json["resultTime"]
+    )
+
+
+def LBUserModelFromJSON(json):
+    return LBUserModel(
+        json["id"],
+        json["username"],
+        json["isBanned"],
+        json["isModerator"],
+        json["leaderboards"],
+        json["joinDate"],
+        json["lastActiveDate"],
+        json["mw2Elo"],
+        json["bo2Elo"],
+        json["mwiiElo"],
+        list(map(
+            lambda x: ChallengeResultModelFromJSON(x), json["matchHistory"])),
+        list(map(
+            lambda x: ChallengeModelFromJSON(x), json["activeChallenges"])),
+        list(map(
+            lambda x: ChallengeModelFromJSON(x), json["pendingChallenges"])),
+        list(map(
+            lambda x: ChallengeModelFromJSON(x), json["challengeHistory"])),
+        list(map(
+            lambda x: ModerationActionModelFromJSON(x), json["moderationHistory"]))
+    )
+
+
+def ChallengeModelFromJSON(json):
+    return ChallengeModel(
+        json["id"],
+        json["challengeTime"],
+        LBUserModelFromJSON(json["challenger"]),
+        LBUserModelFromJSON(json["challenged"]),
+        json["leaderboard"],
+        json["isAccepted"],
+        json["isMandatory"],
+        json["expiryTime"],
+        json["result"],
+    )
