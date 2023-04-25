@@ -89,6 +89,9 @@ class TinyDBService:
             userStrings.append(str(lbUserObj))
         return ",\n".join(userStrings)
 
+    def getLeaderboardUsersData(self):
+        return self.db.table(self.lbUsersTable).all()
+
     def getLeaderboardUsersByLeaderboard(self, leaderboard):
         userStrings = []
         for user in self.db.table(self.lbUsersTable).search(Query().leaderboards.any([leaderboard])):
@@ -174,17 +177,6 @@ class TinyDBService:
             if challenge is None:
                 raise Exception(
                     "User does not have a pending challenge with that id")
-            # challengeObj = ChallengeModel(
-            #     id=challenge['id'],
-            #     challengeTime=challenge['challengeTime'],
-            #     challenger=challenge['challenger'],
-            #     challenged=challenge['challenged'],
-            #     leaderboard=challenge['leaderboard'],
-            #     isAccepted=challenge['isAccepted'],
-            #     isMandatory=challenge['isMandatory'],
-            #     expiryTime=challenge['expiryTime'],
-            #     result=challenge['result'],
-            # )
             challengeObj = ChallengeModelFromJSON(challenge)
             self.db.table(self.lbUsersTable).update(
                 {'pendingChallenges': list(filter(lambda x: x['id'] != challengeId, user['pendingChallenges']))}, Query().id == userId)
@@ -197,10 +189,16 @@ class TinyDBService:
         if len(user['pendingChallenges']) == 0:
             raise Exception("User does not have any pending challenges")
         else:
-            self.db.table(self.lbUsersTable).update(
-                {'pendingChallenges': []}, Query().id == userId)
-            self.db.table(self.lbUsersTable).update(
-                {'lastActiveDate': getNowAsStr()}, Query().id == userId)
+            for challenge in user['pendingChallenges']:
+                challengeObj = ChallengeModelFromJSON(challenge)
+                self.db.table(self.lbUsersTable).update(
+                    {'pendingChallenges': list(filter(lambda x: x['challenger']['id'] != challengeObj.challenger.id and x['challenged']['id'] != challengeObj.challenged.id, user['pendingChallenges']))}, Query().id == challengeObj.challenger.id)
+                self.db.table(self.lbUsersTable).update(
+                    {'lastActiveDate': getNowAsStr()}, Query().id == challengeObj.challenger.id)
+                self.db.table(self.lbUsersTable).update(
+                    {'pendingChallenges': list(filter(lambda x: x['challenger']['id'] != challengeObj.challenger.id and x['challenged']['id'] != challengeObj.challenged.id, user['pendingChallenges']))}, Query().id == challengeObj.challenged.id)
+                self.db.table(self.lbUsersTable).update(
+                    {'lastActiveDate': getNowAsStr()}, Query().id == challengeObj.challenged.id)
             return "Removed all pending challenges from " + str(user['username'])
 
     def addLeaderboardModerator(self, user):
@@ -255,6 +253,9 @@ class TinyDBService:
         # except:
         #     pass
         return ",\n".join(userStrings)
+
+    def getLeaderboardModeratorsData(self):
+        return self.db.table(self.lbModeratorTable).all()
 
     def getLogs(self):
         return self.db.table(self.logsTable)

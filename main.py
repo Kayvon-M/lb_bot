@@ -6,7 +6,7 @@ from discord import app_commands
 
 from source.core.utils.elo_utils import getNewRatings
 from source.data.api.lb.lb_api import LBApi
-from source.data.models.base_models import ChallengeModel, LBModeratorModel, LBUserModel
+from source.data.models.base_models import ChallengeModel, LBModeratorModel, LBUserModel, LBUserModelFromJSON
 from source.data.models.services.tinydb.tinydb_service import TinyDBService
 from source.core.utils.time_utils import getNowAsStr
 
@@ -72,8 +72,8 @@ async def add_lb_user(ctx, user: discord.User, username: str, mw2: app_commands.
         leadebords.append("bo2")
     if mwii.value == 1:
         leadebords.append("mwii")
-    users = dbService.getLeaderboardUsers()
-    if list(filter(lambda user: user.id == user.id, users)) == []:
+    users = dbService.getLeaderboardUsersData()
+    if list(filter(lambda userData: LBUserModelFromJSON(userData).id == user.id, users)) == []:
         user = LBUserModel(
             id=user.id,
             username=username,
@@ -295,6 +295,27 @@ async def lb_rm_all_challenges(ctx, user: discord.User):
         await ctx.response.send_message(content="Challenges removed: " + str(challenges))
     except Exception as e:
         await ctx.response.send_message(content="Could not remove challenges.\nReason: " + str(e))
+
+
+@tree.command(name="create-text-channel", description="Create a Text Channel.", guild=discord.Object(id=config['guildId']))
+@app_commands.choices(leaderboard=[
+    app_commands.Choice(name="MW2", value="mw2"),
+    app_commands.Choice(name="BO2", value="bo2"),
+    app_commands.Choice(name="MWII", value="mwii")
+])
+async def create_text_channel(ctx, name: str, challenger: discord.User, challenged: discord.User, leaderboard: str):
+    # try:
+    channel = await ctx.guild.create_text_channel(name)
+    await channel.set_permissions(ctx.guild.default_role, send_messages=False)
+    await channel.set_permissions(challenger, send_messages=True)
+    await channel.set_permissions(challenged, send_messages=True)
+    admins = dbService.getLeaderboardModeratorsData()
+    for admin in admins:
+        await channel.set_permissions(client.get_user(admin["id"]), send_messages=True)
+    await channel.send(content=f"{challenger.mention} has challenged {challenged.mention} to a {leaderboard} match!")
+    await ctx.response.send_message(content="Channel created: " + channel.mention)
+    # except Exception as e:
+    #     await ctx.response.send_message(content="Could not create channel.\nReason: " + str(e))
 
 
 @tree.command(name="add-mod-user", description="Add Moderator User.", guild=discord.Object(id=config['guildId']))

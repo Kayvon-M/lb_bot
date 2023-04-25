@@ -188,6 +188,12 @@ class LBApi:
         try:
             removedChallenge = self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
                 userId, challengeId)
+            if removedChallenge.challenger.id == userId:
+                self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
+                    removedChallenge.challenged.id, challengeId)
+            else:
+                self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
+                    removedChallenge.challenger.id, challengeId)
             return "Removed " + str(removedChallenge) + " from " + str(removedChallenge.challenger.username) + "'s pending challenges."
         except IndexError:
             raise Exception("Invalid user ID or challenge ID.")
