@@ -1,4 +1,5 @@
 import json
+import re
 import discord
 from tinydb import TinyDB, Query
 from source.core.utils.time_utils import getNowAsStr
@@ -42,6 +43,14 @@ class TinyDBService:
             moderationHistory=user['moderationHistory'],
         )
         return "Found " + str(userString)
+
+    def getLeaderboardUserDataByUsername(self, username):
+        user = self.db.table(self.lbUsersTable).get(
+            Query().username.matches(username, flags=re.IGNORECASE))
+        if user is None:
+            raise Exception("User not found")
+        # print(user)
+        return user
 
     def removeLeaderboardUser(self, userId):
         user = self.db.table(self.lbUsersTable).get(
