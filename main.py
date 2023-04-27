@@ -261,6 +261,33 @@ async def get_lb_user_pending(ctx, user: discord.User):
     # await ctx.response.send_message(content="Found:\n" + "\n".join([f"\t{str(challenge)}" for challenge in pendingChallenges]))
 
 
+@client.event
+async def on_reaction_add(reaction, user):
+    # print("reaction added")
+    category = client.get_channel(config["challengeCategoryId"])
+    channel = reaction.message.channel
+    challengedName = str(channel.name).split("-vs-")[1]
+    try:
+        challengedUserData = dbService.getLeaderboardUserDataByUsername(
+            challengedName)
+        challengedObj = LBUserModelFromJSON(challengedUserData)
+        # print(challengedObj)
+        if channel.category_id == category.id:
+            if user.id != client.user.id and reaction.message.author.id == challengedObj.id:
+                if reaction.emoji == "✅":
+                    await reaction.message.delete()
+                    await channel.send("Challenge Accepted!")
+                    # await lbApi.acceptChallenge(channel.name)
+                elif reaction.emoji == "❌":
+                    await reaction.message.delete()
+                    await channel.send("Challenge Declined!")
+                    # await lbApi.declineChallenge(channel.name)
+            elif user.id != client.user.id and reaction.message.author.id != challengedObj.id:
+                await reaction.message.remove_reaction(reaction.emoji, user)
+    except Exception as e:
+        await channel.send("Could not find a challenge for " + str(user) + ".\nReason: " + str(e))
+
+
 @tree.command(name="lb-challenge", description="Challenge a Player from a Leaderboard.", guild=discord.Object(id=config['guildId']))
 @app_commands.choices(leaderboard=[
     app_commands.Choice(name="MW2", value="mw2"),
@@ -271,7 +298,19 @@ async def lb_challenge(ctx, challenged: discord.User, leaderboard: app_commands.
     try:
         challenge = lbApi.challengeLBUser(
             ctx.user.id, challenged.id, leaderboard.value)
-        await ctx.response.send_message(content="Challenge created: " + str(challenge))
+        category = client.get_channel(config["challengeCategoryId"])
+        channel = await category.create_text_channel(str(challenge.challenger.username).lower() + "-vs-" + str(challenge.challenged.username).lower())
+        await channel.set_permissions(ctx.guild.default_role, send_messages=False, add_reactions=False)
+        await channel.set_permissions(ctx.user, send_messages=True, add_reactions=True)
+        await channel.set_permissions(challenged, send_messages=True, add_reactions=True)
+        admins = dbService.getLeaderboardModeratorsData()
+        for admin in admins:
+            await channel.set_permissions(client.get_user(admin["id"]), send_messages=True, add_reactions=False)
+        message = await channel.send(content=f"{ctx.user.mention} has challenged {challenged.mention} to a {leaderboard.value} match!")
+        reactions = ["✅", "❌"]
+        for reaction in reactions:
+            await message.add_reaction(reaction)
+        await ctx.response.send_message(content="Challenge created: " + str(challenge) + "\n" + "Channel created: " + channel.mention)
     except Exception as e:
         await ctx.response.send_message(content="Could not create challenge.\nReason: " + str(e))
 
