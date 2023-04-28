@@ -65,36 +65,54 @@ async def elo_test(ctx, challenger: int, challenged: int, result: app_commands.C
     app_commands.Choice(name="Not Playing", value=0)
 ])
 async def add_lb_user(ctx, user: discord.User, username: str, mw2: app_commands.Choice[int], bo2: app_commands.Choice[int], mwii: app_commands.Choice[int]):
-    leadebords = []
-    if mw2.value == 1:
-        leadebords.append("mw2")
-    if bo2.value == 1:
-        leadebords.append("bo2")
-    if mwii.value == 1:
-        leadebords.append("mwii")
-    users = dbService.getLeaderboardUsersData()
-    if list(filter(lambda userData: LBUserModelFromJSON(userData).id == user.id, users)) == []:
-        user = LBUserModel(
-            id=user.id,
-            username=username,
-            isBanned=False,
-            isModerator=False,
-            leaderboards=leadebords,
-            joinDate=getNowAsStr(),
-            lastActiveDate=getNowAsStr(),
-            mw2Elo=500 if mw2.value == 1 else None,
-            bo2Elo=500 if bo2.value == 1 else None,
-            mwiiElo=500 if mwii.value == 1 else None,
-            matchHistory=[],
-            activeChallenges=[],
-            pendingChallenges=[],
-            challengeHistory=[],
-            moderationHistory=[],
-        )
-        dbService.addLeaderboardUser(user)
-        await ctx.response.send_message(content="Added " + str(user) + " to the database.")
-    else:
-        await ctx.response.send_message(content="User already exists in the database.")
+    try:
+        leadebords = []
+        if mw2.value == 1:
+            leadebords.append("mw2")
+        if bo2.value == 1:
+            leadebords.append("bo2")
+        if mwii.value == 1:
+            leadebords.append("mwii")
+        users = dbService.getLeaderboardUsersData()
+        if list(filter(lambda userData: LBUserModelFromJSON(userData).username == username, users)) == []:
+            user = LBUserModel(
+                id=user.id,
+                username=username,
+                isBanned=False,
+                isModerator=False,
+                leaderboards=leadebords,
+                joinDate=getNowAsStr(),
+                lastActiveDate=getNowAsStr(),
+                mw2Elo=500 if mw2.value == 1 else None,
+                bo2Elo=500 if bo2.value == 1 else None,
+                mwiiElo=500 if mwii.value == 1 else None,
+                matchHistory=[],
+                activeChallenges=[],
+                pendingChallenges=[],
+                challengeHistory=[],
+                moderationHistory=[],
+            )
+            dbService.addLeaderboardUser(user)
+            await ctx.response.send_message(content="Added " + str(user) + " to the database.")
+        else:
+            await ctx.response.send_message(content="User already exists in the database.")
+    except Exception as e:
+        await ctx.response.send_message(content="Could not add user to the database.\nReason: " + str(e))
+
+
+@tree.command(name="change-user-elo", description="Change User Elo.", guild=discord.Object(id=config['guildId']))
+@app_commands.choices(leaderboard=[
+    app_commands.Choice(name="MW2", value="mw2"),
+    app_commands.Choice(name="BO2", value="bo2"),
+    app_commands.Choice(name="MWII", value="mwii")
+])
+async def change_user_elo(ctx, user: discord.User, leaderboard: app_commands.Choice[str], elo: int):
+    try:
+        updatedString = dbService.updateLeaderboardUserElo(
+            user.id, leaderboard.value, elo)
+        await ctx.response.send_message(content=updatedString)
+    except Exception as e:
+        await ctx.response.send_message(content="Could not change user elo.\nReason: " + str(e))
 
 
 @tree.command(name="lb-register", description="Register for Leaderboard(s)", guild=discord.Object(id=config['guildId']))
@@ -111,36 +129,39 @@ async def add_lb_user(ctx, user: discord.User, username: str, mw2: app_commands.
     app_commands.Choice(name="Not Playing", value=0)
 ])
 async def lb_register(ctx, username: str, mw2: app_commands.Choice[int], bo2: app_commands.Choice[int], mwii: app_commands.Choice[int]):
-    leadebords = []
-    if mw2.value == 1:
-        leadebords.append("mw2")
-    if bo2.value == 1:
-        leadebords.append("bo2")
-    if mwii.value == 1:
-        leadebords.append("mwii")
-    userFound = dbService.getLeaderboardUser(ctx.user.id)
-    if userFound is None:
-        user = LBUserModel(
-            id=ctx.user.id,
-            username=username,
-            isBanned=False,
-            isModerator=False,
-            leaderboards=leadebords,
-            joinDate=getNowAsStr(),
-            lastActiveDate=getNowAsStr(),
-            mw2Elo=500 if mw2.value == 1 else None,
-            bo2Elo=500 if bo2.value == 1 else None,
-            mwiiElo=500 if mwii.value == 1 else None,
-            matchHistory=[],
-            activeChallenges=[],
-            pendingChallenges=[],
-            challengeHistory=[],
-            moderationHistory=[],
-        )
-        dbService.addLeaderboardUser(user)
-        await ctx.response.send_message(content="Added " + str(user) + " to the database.")
-    else:
-        await ctx.response.send_message(content="You are already registered.")
+    try:
+        leadebords = []
+        if mw2.value == 1:
+            leadebords.append("mw2")
+        if bo2.value == 1:
+            leadebords.append("bo2")
+        if mwii.value == 1:
+            leadebords.append("mwii")
+        users = dbService.getLeaderboardUsersData()
+        if list(filter(lambda userData: LBUserModelFromJSON(userData).username == username, users)) == []:
+            user = LBUserModel(
+                id=ctx.user.id,
+                username=username,
+                isBanned=False,
+                isModerator=False,
+                leaderboards=leadebords,
+                joinDate=getNowAsStr(),
+                lastActiveDate=getNowAsStr(),
+                mw2Elo=500 if mw2.value == 1 else None,
+                bo2Elo=500 if bo2.value == 1 else None,
+                mwiiElo=500 if mwii.value == 1 else None,
+                matchHistory=[],
+                activeChallenges=[],
+                pendingChallenges=[],
+                challengeHistory=[],
+                moderationHistory=[],
+            )
+            dbService.addLeaderboardUser(user)
+            await ctx.response.send_message(content="Added " + str(user) + " to the database.")
+        else:
+            await ctx.response.send_message(content="User already exists in the database.")
+    except Exception as e:
+        await ctx.response.send_message(content="Could not add user to the database.\nReason: " + str(e))
 
 
 @tree.command(name="get-lb-user", description="Get Player from a Leaderboard.", guild=discord.Object(id=config['guildId']))
@@ -180,6 +201,41 @@ async def list_users_lb(ctx, leaderboard: app_commands.Choice[str]):
     usersString = dbService.getLeaderboardUsersByLeaderboard(leaderboard.value)
     if usersString != "":
         await ctx.response.send_message(content=str(usersString))
+    else:
+        await ctx.response.send_message(content="Could not find any players.")
+
+
+@tree.command(name="list-users-lb-ranked", description="List a Leaderboard's Ranked Users ranked by ELO.", guild=discord.Object(id=config['guildId']))
+@app_commands.choices(leaderboard=[
+    app_commands.Choice(name="MW2", value="mw2"),
+    app_commands.Choice(name="BO2", value="bo2"),
+    app_commands.Choice(name="MWII", value="mwii")
+])
+async def list_users_lb_ranked(ctx, leaderboard: app_commands.Choice[str]):
+    usersData = dbService.getLeaderboardUsersDataByLeaderboard(
+        leaderboard.value)
+    if usersData != []:
+        users = list(
+            map(lambda userData: LBUserModelFromJSON(userData), usersData))
+        usersString = ""
+        if leaderboard.value == "mw2":
+            users.sort(key=lambda user: user.mw2Elo, reverse=True)
+            for i in range(len(users)):
+                usersString += str(i + 1) + ". " + \
+                    str(users[i].username) + " " + str(users[i].mw2Elo) + "\n"
+            await ctx.response.send_message(content=usersString)
+        elif leaderboard.value == "bo2":
+            users.sort(key=lambda user: user.bo2Elo, reverse=True)
+            for i in range(len(users)):
+                usersString += str(i + 1) + ". " + \
+                    str(users[i].username) + " " + str(users[i].bo2Elo) + "\n"
+            await ctx.response.send_message(content=usersString)
+        elif leaderboard.value == "mwii":
+            users.sort(key=lambda user: user.mwiiElo, reverse=True)
+            for i in range(len(users)):
+                usersString += str(i + 1) + ". " + \
+                    str(users[i].username) + " " + str(users[i].mwiiElo) + "\n"
+            await ctx.response.send_message(content=usersString)
     else:
         await ctx.response.send_message(content="Could not find any players.")
 
@@ -263,17 +319,15 @@ async def get_lb_user_pending(ctx, user: discord.User):
 
 @client.event
 async def on_reaction_add(reaction, user):
-    # print("reaction added")
     category = client.get_channel(config["challengeCategoryId"])
     channel = reaction.message.channel
     challengedName = str(channel.name).split("-vs-")[1]
+    challengedUserData = dbService.getLeaderboardUserDataByUsername(
+        challengedName)
+    challengedObj = LBUserModelFromJSON(challengedUserData)
     try:
-        challengedUserData = dbService.getLeaderboardUserDataByUsername(
-            challengedName)
-        challengedObj = LBUserModelFromJSON(challengedUserData)
-        # print(challengedObj)
         if channel.category_id == category.id:
-            if user.id != client.user.id and reaction.message.author.id == challengedObj.id:
+            if user.id != client.user.id and user.id == challengedObj.id:
                 if reaction.emoji == "✅":
                     await reaction.message.delete()
                     await channel.send("Challenge Accepted!")
@@ -282,7 +336,7 @@ async def on_reaction_add(reaction, user):
                     await reaction.message.delete()
                     await channel.send("Challenge Declined!")
                     # await lbApi.declineChallenge(channel.name)
-            elif user.id != client.user.id and reaction.message.author.id != challengedObj.id:
+            elif user.id != client.user.id and user.id != challengedObj.id:
                 await reaction.message.remove_reaction(reaction.emoji, user)
     except Exception as e:
         await channel.send("Could not find a challenge for " + str(user) + ".\nReason: " + str(e))

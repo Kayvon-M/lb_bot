@@ -18,6 +18,10 @@ class TinyDBService:
         return json.loads(document)
 
     def addLeaderboardUser(self, user):
+        lbUserUsernames = [str(user['username']).lower() for user in self.db.table(
+            self.lbUsersTable).all()]
+        if str(user.username).lower() in lbUserUsernames:
+            raise Exception("Username must be unique")
         self.db.table(self.lbUsersTable).insert(user.toJSON())
 
     def getLeaderboardUser(self, userId):
@@ -47,9 +51,10 @@ class TinyDBService:
     def getLeaderboardUserDataByUsername(self, username):
         user = self.db.table(self.lbUsersTable).get(
             Query().username.matches(username, flags=re.IGNORECASE))
+        # Query().username == username)
         if user is None:
             raise Exception("User not found")
-        # print(user)
+        print(user)
         return user
 
     def removeLeaderboardUser(self, userId):
@@ -74,6 +79,38 @@ class TinyDBService:
         )
         self.db.table(self.lbUsersTable).remove(Query().id == userId)
         return "Removed " + str(userString)
+
+    def updateLeaderboardUserElo(self, userId, leaderboard, elo):
+        user = self.db.table(self.lbUsersTable).get(
+            Query().id == userId)
+        userString = LBUserModel(
+            id=user['id'],
+            username=user['username'],
+            isBanned=user['isBanned'],
+            isModerator=user['isModerator'],
+            leaderboards=user['leaderboards'],
+            joinDate=user['joinDate'],
+            lastActiveDate=user['lastActiveDate'],
+            mw2Elo=user['mw2Elo'],
+            bo2Elo=user['bo2Elo'],
+            mwiiElo=user['mwiiElo'],
+            matchHistory=user['matchHistory'],
+            activeChallenges=user['activeChallenges'],
+            pendingChallenges=user['pendingChallenges'],
+            challengeHistory=user['challengeHistory'],
+            moderationHistory=user['moderationHistory'],
+        )
+        if leaderboard == 'mw2':
+            userString.mw2Elo = elo
+        elif leaderboard == 'bo2':
+            userString.bo2Elo = elo
+        elif leaderboard == 'mwii':
+            userString.mwiiElo = elo
+        else:
+            raise Exception("Invalid leaderboard")
+        self.db.table(self.lbUsersTable).update(
+            userString.toJSON(), Query().id == userId)
+        return "Updated " + str(userString) + " " + leaderboard + " elo to " + str(elo)
 
     def getLeaderboardUsers(self):
         userStrings = []
@@ -135,18 +172,20 @@ class TinyDBService:
 
     def addChallengeToLeaderboardUserPendingChallenges(self, userId, challenge):
         user = self.db.table(self.lbUsersTable).get(Query().id == userId)
-        if len(user['pendingChallenges']) == 0:
+        userMandatoryChallenges = list(
+            filter(lambda x: x['isMandatory'] == True, user['pendingChallenges']))
+        if len(userMandatoryChallenges) == 0:
             self.db.table(self.lbUsersTable).update(
                 {'pendingChallenges': [challenge]}, Query().id == userId)
             self.db.table(self.lbUsersTable).update(
                 {'lastActiveDate': getNowAsStr()}, Query().id == userId)
-        elif len(user['pendingChallenges']) == 1:
+        elif len(userMandatoryChallenges) == 1:
             self.db.table(self.lbUsersTable).update(
                 {'pendingChallenges': [user['pendingChallenges'][0], challenge]}, Query().id == userId)
             self.db.table(self.lbUsersTable).update(
                 {'lastActiveDate': getNowAsStr()}, Query().id == userId)
-        elif len(user['pendingChallenges']) == 2:
-            raise Exception("User already has 2 pending challenges")
+        elif len(userMandatoryChallenges) == 2:
+            raise Exception("User already has 2 pending mandatory challenges")
         user = self.db.table(self.lbUsersTable).get(Query().id == userId)
         lbUser = LBUserModel(
             id=user['id'],
