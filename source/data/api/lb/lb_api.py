@@ -3,7 +3,7 @@ import json
 from source.core.utils.time_utils import dateTimeToDateStr, getNowAsStr
 from source.data.models.base_models import ChallengeModel, LBUserModel
 
-from source.data.models.services.tinydb.tinydb_service import TinyDBService
+from source.data.services.tinydb.tinydb_service import TinyDBService
 
 # Load config
 with open('source/config/config.json') as f:

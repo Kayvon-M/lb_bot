@@ -7,7 +7,7 @@ from discord import app_commands
 from source.core.utils.elo_utils import getNewRatings
 from source.data.api.lb.lb_api import LBApi
 from source.data.models.base_models import ChallengeModel, LBModeratorModel, LBUserModel, LBUserModelFromJSON
-from source.data.models.services.tinydb.tinydb_service import TinyDBService
+from source.data.services.tinydb.tinydb_service import TinyDBService
 from source.core.utils.time_utils import getNowAsStr
 
 # Load config
