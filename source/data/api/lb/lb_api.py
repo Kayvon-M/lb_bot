@@ -1,7 +1,7 @@
 import datetime
 import json
 from source.core.utils.time_utils import dateTimeToDateStr, getNowAsStr
-from source.data.models.base_models import ChallengeModel, LBUserModel
+from source.data.models.base_models import ChallengeModel, ChallengeModelFromJSON, LBUserModel, LBUserModelFromJSON
 
 from source.data.services.tinydb.tinydb_service import TinyDBService
 
@@ -205,3 +205,59 @@ class LBApi:
             return removedChallenges
         except IndexError:
             raise Exception("Invalid user ID.")
+
+    def acceptChallenge(self, challenge):
+        # challenge = ChallengeModelFromJSON(challenge)
+        challenger = challenge["challenger"]
+        challenged = challenge["challenged"]
+        challengerData = self.dbService.getLeaderboardUserDataById(
+            challenger["id"])
+        # print(challengerData["pendingChallenges"])
+        challengedData = self.dbService.getLeaderboardUserDataById(
+            challenged["id"])
+        # print(challengedData["pendingChallenges"])
+        # challengerObj = LBUserModelFromJSON(
+        #     challengerData)
+        # challengedObj = LBUserModelFromJSON(
+        #     challengedData)
+        challengerPendingChallenge = list(filter(
+            lambda x: x["challenged"]["id"] == challenged["id"], challengerData["pendingChallenges"]))
+        challengedPendingChallenge = list(filter(
+            lambda x: x["challenger"]["id"] == challenger["id"], challengedData["pendingChallenges"]))
+        if len(challengerPendingChallenge) == 0 or len(challengedPendingChallenge) == 0:
+            raise Exception("No pending challenge found.")
+        # print(challengerPendingChallenge)
+        # print(challengedPendingChallenge)
+        removedChallengerChallenge = self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
+            challenger["id"], challengerPendingChallenge[0]["id"])
+        removedChallengedChallenge = self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
+            challenged["id"], challengedPendingChallenge[0]["id"])
+        challengerPendingChallenge[0]["isAccepted"] = True
+        challengedPendingChallenge[0]["isAccepted"] = True
+        addedActiveChallengerChallenge = self.dbService.addChallengeToLeaderboardUserActiveChallenges(
+            challenger["id"], challengerPendingChallenge[0])
+        addedActiveChallengedChallenge = self.dbService.addChallengeToLeaderboardUserActiveChallenges(
+            challenged["id"], challengedPendingChallenge[0])
+        return "Accepted challenge " + str(removedChallengerChallenge) + " from " + str(removedChallengerChallenge.challenger.username) + " to " + str(removedChallengerChallenge.challenged.username) + "."
+
+    def declineChallenge(self, challenge):
+        challenge = ChallengeModelFromJSON(challenge)
+        challenger = challenge.challenger
+        challenged = challenge.challenged
+        challengerData = self.dbService.getLeaderboardUserDataById(
+            challenger.id)
+        challengedData = self.dbService.getLeaderboardUserDataById(
+            challenged.id)
+        challengerObj = LBUserModelFromJSON(
+            challengerData)
+        challengedObj = LBUserModelFromJSON(
+            challengedData)
+        challengerPendingChallenge = list(filter(
+            lambda x: x["challenged"]["id"] == challenged.id, challengerData["pendingChallenges"]))[0]
+        challengedPendingChallenge = list(filter(
+            lambda x: x["challenger"]["id"] == challenger.id, challengedData["pendingChallenges"]))[0]
+        removedChallengerChallenge = self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
+            challenger.id, challengerPendingChallenge["id"])
+        removedChallengedChallenge = self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
+            challenged.id, challengedPendingChallenge["id"])
+        return "Declined challenge " + str(removedChallengerChallenge) + " from " + str(removedChallengerChallenge.challenger.username) + " to " + str(removedChallengerChallenge.challenged.username) + "."

@@ -48,13 +48,20 @@ class TinyDBService:
         )
         return "Found " + str(userString)
 
+    def getLeaderboardUserDataById(self, userId):
+        user = self.db.table(self.lbUsersTable).get(
+            Query().id == userId)
+        if user is None:
+            return None
+        return user
+
     def getLeaderboardUserDataByUsername(self, username):
         user = self.db.table(self.lbUsersTable).get(
             Query().username.matches(username, flags=re.IGNORECASE))
         # Query().username == username)
         if user is None:
             raise Exception("User not found")
-        print(user)
+        # print(user)
         return user
 
     def removeLeaderboardUser(self, userId):
@@ -205,6 +212,148 @@ class TinyDBService:
             moderationHistory=user['moderationHistory'],
         )
         return "Added " + str(challenge) + " to " + str(lbUser)
+
+    def addChallengeToLeaderboardUserActiveChallenges(self, userId, challenge):
+        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+        if (len(user['activeChallenges']) == 0):
+            self.db.table(self.lbUsersTable).update(
+                {'activeChallenges': [challenge]}, Query().id == userId)
+            self.db.table(self.lbUsersTable).update(
+                {'lastActiveDate': getNowAsStr()}, Query().id == userId)
+        elif (len(user['activeChallenges']) == 1):
+            self.db.table(self.lbUsersTable).update(
+                {'activeChallenges': [user['activeChallenges'][0], challenge]}, Query().id == userId)
+            self.db.table(self.lbUsersTable).update(
+                {'lastActiveDate': getNowAsStr()}, Query().id == userId)
+        elif (len(user['activeChallenges']) == 2):
+            raise Exception("User already has 2 active challenges")
+        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+        lbUser = LBUserModel(
+            id=user['id'],
+            username=user['username'],
+            isBanned=user['isBanned'],
+            isModerator=user['isModerator'],
+            leaderboards=user['leaderboards'],
+            joinDate=user['joinDate'],
+            lastActiveDate=user['lastActiveDate'],
+            mw2Elo=user['mw2Elo'],
+            bo2Elo=user['bo2Elo'],
+            mwiiElo=user['mwiiElo'],
+            matchHistory=user['matchHistory'],
+            activeChallenges=user['activeChallenges'],
+            pendingChallenges=user['pendingChallenges'],
+            challengeHistory=user['challengeHistory'],
+            moderationHistory=user['moderationHistory'],
+        )
+        return "Added " + str(challenge) + " to " + str(lbUser)
+
+    def getLeaderboardUserActiveChallengesById(self, userId):
+        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+        activeChallengesStr = ""
+        if len(user['activeChallenges']) == 0:
+            raise Exception("User does not have any active challenges")
+        else:
+            for challenge in user['activeChallenges']:
+                challengeObj = ChallengeModelFromJSON(challenge)
+                activeChallengesStr += str(challengeObj) + "\n"
+        return activeChallengesStr
+
+    def removeChallengeFromLeaderboardUserActiveChallenges(self, userId, challengeId):
+        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+        if len(user['activeChallenges']) == 0:
+            raise Exception("User does not have any active challenges")
+        else:
+            challenge = next(
+                (x for x in user['activeChallenges'] if x['id'] == challengeId), None)
+            if challenge is None:
+                raise Exception(
+                    "User does not have an active challenge with that id")
+            challengeObj = ChallengeModelFromJSON(challenge)
+            self.db.table(self.lbUsersTable).update(
+                {'activeChallenges': list(filter(lambda x: x['id'] != challengeId, user['activeChallenges']))}, Query().id == userId)
+            self.db.table(self.lbUsersTable).update(
+                {'lastActiveDate': getNowAsStr()}, Query().id == userId)
+            user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+            lbUser = LBUserModel(
+                id=user['id'],
+                username=user['username'],
+                isBanned=user['isBanned'],
+                isModerator=user['isModerator'],
+                leaderboards=user['leaderboards'],
+                joinDate=user['joinDate'],
+                lastActiveDate=user['lastActiveDate'],
+                mw2Elo=user['mw2Elo'],
+                bo2Elo=user['bo2Elo'],
+                mwiiElo=user['mwiiElo'],
+                matchHistory=user['matchHistory'],
+                activeChallenges=user['activeChallenges'],
+                pendingChallenges=user['pendingChallenges'],
+                challengeHistory=user['challengeHistory'],
+                moderationHistory=user['moderationHistory'],
+            )
+            return "Removed " + str(challengeObj) + " from " + str(lbUser)
+
+    def addChallengeToLeaderboardUserChallengeHistory(self, userId, challenge):
+        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+        userChallengeHistory = user['challengeHistory']
+        userChallengeHistory.append(challenge)
+        self.db.table(self.lbUsersTable).update(
+            {'challengeHistory': userChallengeHistory}, Query().id == userId)
+        self.db.table(self.lbUsersTable).update(
+            {'lastActiveDate': getNowAsStr()}, Query().id == userId)
+        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+        lbUser = LBUserModel(
+            id=user['id'],
+            username=user['username'],
+            isBanned=user['isBanned'],
+            isModerator=user['isModerator'],
+            leaderboards=user['leaderboards'],
+            joinDate=user['joinDate'],
+            lastActiveDate=user['lastActiveDate'],
+            mw2Elo=user['mw2Elo'],
+            bo2Elo=user['bo2Elo'],
+            mwiiElo=user['mwiiElo'],
+            matchHistory=user['matchHistory'],
+            activeChallenges=user['activeChallenges'],
+            pendingChallenges=user['pendingChallenges'],
+            challengeHistory=user['challengeHistory'],
+            moderationHistory=user['moderationHistory'],
+        )
+        return "Added " + str(challenge) + " to " + str(lbUser)
+
+    def removeChallengeFromLeaderbordUserChallengeHistory(self, userId, challengeId):
+        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+        userChallengeHistory = user['challengeHistory']
+        challenge = next(
+            (x for x in userChallengeHistory if x['id'] == challengeId), None)
+        if challenge is None:
+            raise Exception(
+                "User does not have a challenge with that id in their history")
+        challengeObj = ChallengeModelFromJSON(challenge)
+        userChallengeHistory.remove(challenge)
+        self.db.table(self.lbUsersTable).update(
+            {'challengeHistory': userChallengeHistory}, Query().id == userId)
+        self.db.table(self.lbUsersTable).update(
+            {'lastActiveDate': getNowAsStr()}, Query().id == userId)
+        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+        lbUser = LBUserModel(
+            id=user['id'],
+            username=user['username'],
+            isBanned=user['isBanned'],
+            isModerator=user['isModerator'],
+            leaderboards=user['leaderboards'],
+            joinDate=user['joinDate'],
+            lastActiveDate=user['lastActiveDate'],
+            mw2Elo=user['mw2Elo'],
+            bo2Elo=user['bo2Elo'],
+            mwiiElo=user['mwiiElo'],
+            matchHistory=user['matchHistory'],
+            activeChallenges=user['activeChallenges'],
+            pendingChallenges=user['pendingChallenges'],
+            challengeHistory=user['challengeHistory'],
+            moderationHistory=user['moderationHistory'],
+        )
+        return "Removed " + str(challengeObj) + " from " + str(lbUser)
 
     def getLeaderboardUserPendingChallenges(self, userId):
         user = self.db.table(self.lbUsersTable).get(Query().id == userId)

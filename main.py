@@ -30,6 +30,7 @@ print(dbService.getLeaderboardUsers())
 
 @client.event
 async def on_ready():
+    # await ctx.response.defer()
     await tree.sync(guild=discord.Object(config['guildId']))
 
     activeChannel = client.get_channel(config['activeChannelId'])
@@ -45,10 +46,12 @@ async def on_ready():
     app_commands.Choice(name="DQ", value="dq")
 ])
 # async def elo_test(ctx, challenger: discord.User, challenged: discord.User, result: str):
+# await ctx.response.defer()
 # newRatings = getNewRatings(challenger, challenged, result)
 async def elo_test(ctx, challenger: int, challenged: int, result: app_commands.Choice[str]):
+    await ctx.response.defer()
     newRatings = getNewRatings(challenger, challenged, result.value)
-    await ctx.response.send_message(content="New ratings: " + str(newRatings))
+    await ctx.followup.send(content="New ratings: " + str(newRatings))
 
 
 @tree.command(name="add-lb-user", description="Add Player to a Leaderboard.", guild=discord.Object(id=config['guildId']))
@@ -65,6 +68,7 @@ async def elo_test(ctx, challenger: int, challenged: int, result: app_commands.C
     app_commands.Choice(name="Not Playing", value=0)
 ])
 async def add_lb_user(ctx, user: discord.User, username: str, mw2: app_commands.Choice[int], bo2: app_commands.Choice[int], mwii: app_commands.Choice[int]):
+    await ctx.response.defer()
     try:
         leadebords = []
         if mw2.value == 1:
@@ -93,11 +97,11 @@ async def add_lb_user(ctx, user: discord.User, username: str, mw2: app_commands.
                 moderationHistory=[],
             )
             dbService.addLeaderboardUser(user)
-            await ctx.response.send_message(content="Added " + str(user) + " to the database.")
+            await ctx.followup.send(content="Added " + str(user) + " to the database.")
         else:
-            await ctx.response.send_message(content="User already exists in the database.")
+            await ctx.followup.send(content="User already exists in the database.")
     except Exception as e:
-        await ctx.response.send_message(content="Could not add user to the database.\nReason: " + str(e))
+        await ctx.followup.send(content="Could not add user to the database.\nReason: " + str(e))
 
 
 @tree.command(name="change-user-elo", description="Change User Elo.", guild=discord.Object(id=config['guildId']))
@@ -107,12 +111,13 @@ async def add_lb_user(ctx, user: discord.User, username: str, mw2: app_commands.
     app_commands.Choice(name="MWII", value="mwii")
 ])
 async def change_user_elo(ctx, user: discord.User, leaderboard: app_commands.Choice[str], elo: int):
+    await ctx.response.defer()
     try:
         updatedString = dbService.updateLeaderboardUserElo(
             user.id, leaderboard.value, elo)
-        await ctx.response.send_message(content=updatedString)
+        await ctx.followup.send(content=updatedString)
     except Exception as e:
-        await ctx.response.send_message(content="Could not change user elo.\nReason: " + str(e))
+        await ctx.followup.send(content="Could not change user elo.\nReason: " + str(e))
 
 
 @tree.command(name="lb-register", description="Register for Leaderboard(s)", guild=discord.Object(id=config['guildId']))
@@ -129,6 +134,7 @@ async def change_user_elo(ctx, user: discord.User, leaderboard: app_commands.Cho
     app_commands.Choice(name="Not Playing", value=0)
 ])
 async def lb_register(ctx, username: str, mw2: app_commands.Choice[int], bo2: app_commands.Choice[int], mwii: app_commands.Choice[int]):
+    await ctx.response.defer()
     try:
         leadebords = []
         if mw2.value == 1:
@@ -157,38 +163,41 @@ async def lb_register(ctx, username: str, mw2: app_commands.Choice[int], bo2: ap
                 moderationHistory=[],
             )
             dbService.addLeaderboardUser(user)
-            await ctx.response.send_message(content="Added " + str(user) + " to the database.")
+            await ctx.followup.send(content="Added " + str(user) + " to the database.")
         else:
-            await ctx.response.send_message(content="User already exists in the database.")
+            await ctx.followup.send(content="User already exists in the database.")
     except Exception as e:
-        await ctx.response.send_message(content="Could not add user to the database.\nReason: " + str(e))
+        await ctx.followup.send(content="Could not add user to the database.\nReason: " + str(e))
 
 
 @tree.command(name="get-lb-user", description="Get Player from a Leaderboard.", guild=discord.Object(id=config['guildId']))
 async def get_lb_user(ctx, user: discord.User):
+    await ctx.response.defer()
     try:
         user = dbService.getLeaderboardUser(user.id)
-        await ctx.response.send_message(content="Found " + str(user))
+        await ctx.followup.send(content="Found " + str(user))
     except Exception as e:
-        await ctx.response.send_message(content="Could not find user.")
+        await ctx.followup.send(content="Could not find user.")
 
 
 @tree.command(name="remove-lb-user", description="Remove Player from a Leaderboard.", guild=discord.Object(id=config['guildId']))
 async def remove_lb_user(ctx, user: discord.User):
+    await ctx.response.defer()
     try:
         userString = dbService.removeLeaderboardUser(user.id)
-        await ctx.response.send_message(content=userString)
+        await ctx.followup.send(content=userString)
     except Exception as e:
-        await ctx.response.send_message(content="Could not find user.")
+        await ctx.followup.send(content="Could not find user.")
 
 
 @tree.command(name="list-lb-users", description="List Leaderboard Users.", guild=discord.Object(id=config['guildId']))
 async def list_lb_users(ctx):
+    await ctx.response.defer()
     usersString = dbService.getLeaderboardUsers()
     if usersString != "":
-        await ctx.response.send_message(content=str(usersString))
+        await ctx.followup.send(content=str(usersString))
     else:
-        await ctx.response.send_message(content="Could not find any players.")
+        await ctx.followup.send(content="Could not find any players.")
 
 
 @tree.command(name="list-users-lb", description="List a Leaderboard's Users.", guild=discord.Object(id=config['guildId']))
@@ -198,11 +207,12 @@ async def list_lb_users(ctx):
     app_commands.Choice(name="MWII", value="mwii")
 ])
 async def list_users_lb(ctx, leaderboard: app_commands.Choice[str]):
+    await ctx.response.defer()
     usersString = dbService.getLeaderboardUsersByLeaderboard(leaderboard.value)
     if usersString != "":
-        await ctx.response.send_message(content=str(usersString))
+        await ctx.followup.send(content=str(usersString))
     else:
-        await ctx.response.send_message(content="Could not find any players.")
+        await ctx.followup.send(content="Could not find any players.")
 
 
 @tree.command(name="list-users-lb-ranked", description="List a Leaderboard's Ranked Users ranked by ELO.", guild=discord.Object(id=config['guildId']))
@@ -212,6 +222,7 @@ async def list_users_lb(ctx, leaderboard: app_commands.Choice[str]):
     app_commands.Choice(name="MWII", value="mwii")
 ])
 async def list_users_lb_ranked(ctx, leaderboard: app_commands.Choice[str]):
+    await ctx.response.defer()
     usersData = dbService.getLeaderboardUsersDataByLeaderboard(
         leaderboard.value)
     if usersData != []:
@@ -223,27 +234,28 @@ async def list_users_lb_ranked(ctx, leaderboard: app_commands.Choice[str]):
             for i in range(len(users)):
                 usersString += str(i + 1) + ". " + \
                     str(users[i].username) + " " + str(users[i].mw2Elo) + "\n"
-            await ctx.response.send_message(content=usersString)
+            await ctx.followup.send(content=usersString)
         elif leaderboard.value == "bo2":
             users.sort(key=lambda user: user.bo2Elo, reverse=True)
             for i in range(len(users)):
                 usersString += str(i + 1) + ". " + \
                     str(users[i].username) + " " + str(users[i].bo2Elo) + "\n"
-            await ctx.response.send_message(content=usersString)
+            await ctx.followup.send(content=usersString)
         elif leaderboard.value == "mwii":
             users.sort(key=lambda user: user.mwiiElo, reverse=True)
             for i in range(len(users)):
                 usersString += str(i + 1) + ". " + \
                     str(users[i].username) + " " + str(users[i].mwiiElo) + "\n"
-            await ctx.response.send_message(content=usersString)
+            await ctx.followup.send(content=usersString)
     else:
-        await ctx.response.send_message(content="Could not find any players.")
+        await ctx.followup.send(content="Could not find any players.")
 
 
 @tree.command(name="get-num-lb-users", description="Get Number of Leaderboard Users.", guild=discord.Object(id=config['guildId']))
 async def get_num_lb_users(ctx):
+    await ctx.response.defer()
     numUsers = dbService.getLeaderboardUserCount()
-    await ctx.response.send_message(content="There are " + str(numUsers) + " lb users in the database.")
+    await ctx.followup.send(content="There are " + str(numUsers) + " lb users in the database.")
 
 
 @tree.command(name="get-lb-num-users", description="Get Number of Leaderboard Users.", guild=discord.Object(id=config['guildId']))
@@ -253,13 +265,15 @@ async def get_num_lb_users(ctx):
     app_commands.Choice(name="MWII", value="mwii")
 ])
 async def get_lb_num_users(ctx, leaderboard: app_commands.Choice[str]):
+    await ctx.response.defer()
     numUsers = dbService.getLeaderboardUserCountByLeaderboard(
         leaderboard.value)
-    await ctx.response.send_message(content="There are " + str(numUsers) + " " + leaderboard.value + " lb users in the database.")
+    await ctx.followup.send(content="There are " + str(numUsers) + " " + leaderboard.value + " lb users in the database.")
 
 
 @tree.command(name="get-lb-user-pending", description="Get Player's Pending Challenges.", guild=discord.Object(id=config['guildId']))
 async def get_lb_user_pending(ctx, user: discord.User):
+    await ctx.response.defer()
     try:
         pendingChallenges = dbService.getLeaderboardUserPendingChallenges(
             user.id)
@@ -311,35 +325,62 @@ async def get_lb_user_pending(ctx, user: discord.User):
             pendingChallengesObjs.append(challengeObj)
         if len(pendingChallengesObjs) == 0:
             raise Exception("No pending challenges found.")
-        await ctx.response.send_message(content="\n".join([f"Found {str(challenge)}" for challenge in pendingChallengesObjs]))
+        await ctx.followup.send(content="\n".join([f"Found {str(challenge)}" for challenge in pendingChallengesObjs]))
     except Exception as e:
-        await ctx.response.send_message(content="Could not find any pending challenges for " + str(user) + ".\nReason: " + str(e))
-    # await ctx.response.send_message(content="Found:\n" + "\n".join([f"\t{str(challenge)}" for challenge in pendingChallenges]))
+        await ctx.followup.send(content="Could not find any pending challenges for " + str(user.name) + ".\nReason: " + str(e))
+    # await ctx.followup.send(content="Found:\n" + "\n".join([f"\t{str(challenge)}" for challenge in pendingChallenges]))
 
 
 @client.event
 async def on_reaction_add(reaction, user):
+    # await ctx.response.defer()
     category = client.get_channel(config["challengeCategoryId"])
     channel = reaction.message.channel
+    challengerName = str(channel.name).split("-vs-")[0]
     challengedName = str(channel.name).split("-vs-")[1]
+    challengerUserData = dbService.getLeaderboardUserDataByUsername(
+        challengerName)
     challengedUserData = dbService.getLeaderboardUserDataByUsername(
         challengedName)
+    challengerObj = LBUserModelFromJSON(challengerUserData)
     challengedObj = LBUserModelFromJSON(challengedUserData)
-    try:
-        if channel.category_id == category.id:
-            if user.id != client.user.id and user.id == challengedObj.id:
-                if reaction.emoji == "✅":
-                    await reaction.message.delete()
-                    await channel.send("Challenge Accepted!")
-                    # await lbApi.acceptChallenge(channel.name)
-                elif reaction.emoji == "❌":
-                    await reaction.message.delete()
-                    await channel.send("Challenge Declined!")
-                    # await lbApi.declineChallenge(channel.name)
-            elif user.id != client.user.id and user.id != challengedObj.id:
-                await reaction.message.remove_reaction(reaction.emoji, user)
-    except Exception as e:
-        await channel.send("Could not find a challenge for " + str(user) + ".\nReason: " + str(e))
+    # challengerChallenge = list(filter(lambda x: x.challenger.id ==
+    #                            challengerObj.id and x.challenged.id == challengedObj.id, challengerObj.pendingChallenges))[0]
+    # challengedChallenge = list(filter(lambda x: x.challenger.id ==
+    #    challengerObj.id and x.challenged.id == challengedObj.id, challengedObj.pendingChallenges))[0]
+    # try:
+    if channel.category_id == category.id:
+        if user.id != client.user.id and user.id == challengedObj.id:
+            if reaction.emoji == "✅":
+                await reaction.message.delete()
+                await channel.send("Challenge Accepted!")
+                challengerChallenges = dbService.getLeaderboardUserPendingChallenges(
+                    challengerObj.id)
+                challengedChallenges = dbService.getLeaderboardUserPendingChallenges(
+                    challengedObj.id)
+                challengerChallenge = list(filter(
+                    lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                challengedChallenge = list(filter(
+                    lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                lbApi.acceptChallenge(challengerChallenge)
+                # lbApi.acceptChallenge(challengedChallenge)
+            elif reaction.emoji == "❌":
+                await reaction.message.delete()
+                await channel.send("Challenge Declined!")
+                challengerChallenges = dbService.getLeaderboardUserPendingChallenges(
+                    challengerObj.id)
+                challengedChallenges = dbService.getLeaderboardUserPendingChallenges(
+                    challengedObj.id)
+                challengerChallenge = list(filter(
+                    lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                challengedChallenge = list(filter(
+                    lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                lbApi.declineChallenge(challengerChallenge)
+                # lbApi.declineChallenge(challengedChallenge)
+        elif user.id != client.user.id and user.id != challengedObj.id:
+            await reaction.message.remove_reaction(reaction.emoji, user)
+    # except Exception as e:
+    #     await channel.send("Could not find a challenge for " + str(user) + ".\nReason: " + str(e))
 
 
 @tree.command(name="lb-challenge", description="Challenge a Player from a Leaderboard.", guild=discord.Object(id=config['guildId']))
@@ -349,6 +390,7 @@ async def on_reaction_add(reaction, user):
     app_commands.Choice(name="MWII", value="mwii")
 ])
 async def lb_challenge(ctx, challenged: discord.User, leaderboard: app_commands.Choice[str]):
+    await ctx.response.defer()
     try:
         challenge = lbApi.challengeLBUser(
             ctx.user.id, challenged.id, leaderboard.value)
@@ -364,30 +406,54 @@ async def lb_challenge(ctx, challenged: discord.User, leaderboard: app_commands.
         reactions = ["✅", "❌"]
         for reaction in reactions:
             await message.add_reaction(reaction)
-        await ctx.response.send_message(content="Challenge created: " + str(challenge) + "\n" + "Channel created: " + channel.mention)
+        await ctx.followup.send(content="Challenge created: " + str(challenge) + "\n" + "Channel created: " + channel.mention)
     except Exception as e:
-        await ctx.response.send_message(content="Could not create challenge.\nReason: " + str(e))
+        await ctx.followup.send(content="Could not create challenge.\nReason: " + str(e))
+
+
+@tree.command(name="lb-rm-active-challenge", description="Remove a Challenge from a user's active challenges.", guild=discord.Object(id=config['guildId']))
+async def lb_rm_active_challenge(ctx, user: discord.User, cid: str):
+    await ctx.response.defer()
+    try:
+        removedStr = dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+            user.id, int(cid))
+        await ctx.followup.send(content=removedStr)
+    except Exception as e:
+        await ctx.followup.send(content="Could not remove challenge.\nReason: " + str(e))
+
+
+@tree.command(name="get-lb-user-active", description="Get a user's active challenges.", guild=discord.Object(id=config['guildId']))
+async def get_lb_user_active(ctx, user: discord.User):
+    await ctx.response.defer()
+    try:
+        activeChallenges = dbService.getLeaderboardUserActiveChallengesById(
+            user.id)
+        await ctx.followup.send(content="Found:\n" + str(activeChallenges))
+    except Exception as e:
+        await ctx.followup.send(content="Could not find any active challenges for " + str(user) + ".\nReason: " + str(e))
 
 
 @tree.command(name="lb-rm-challenge", description="Remove a Challenge from a user's pending challenges.", guild=discord.Object(id=config['guildId']))
 async def lb_rm_challenge(ctx, user: discord.User, cid: str):
+    await ctx.response.defer()
     try:
         newChallengeId = int(cid)
         challenge = lbApi.removeChallengeFromLBUserPendingChallenges(
             user.id, newChallengeId)
-        await ctx.response.send_message(content="Challenge removed: " + challenge)
+        await ctx.followup.send(content="Challenge removed: " + challenge)
     except Exception as e:
-        await ctx.response.send_message(content="Could not remove challenge.\nReason: " + str(e))
+        await ctx.followup.send(content="Could not remove challenge.\nReason: " + str(e))
 
 
 @tree.command(name="lb-rm-all-challenges", description="Remove all Challenges from a user's pending challenges.", guild=discord.Object(id=config['guildId']))
 async def lb_rm_all_challenges(ctx, user: discord.User):
+    await ctx.response.defer()
     try:
         challenges = lbApi.removeAllChallengesFromLBUserPendingChallenges(
             user.id)
-        await ctx.response.send_message(content="Challenges removed: " + str(challenges))
+        await ctx.followup.send(content="Challenges removed: " + str(challenges))
     except Exception as e:
-        await ctx.response.send_message(content="Could not remove challenges.\nReason: " + str(e))
+        await ctx.followup.send(content="Could not remove challenges.\nReason: " + str(e))
 
 
 @tree.command(name="create-text-channel", description="Create a Text Channel.", guild=discord.Object(id=config['guildId']))
@@ -397,6 +463,7 @@ async def lb_rm_all_challenges(ctx, user: discord.User):
     app_commands.Choice(name="MWII", value="mwii")
 ])
 async def create_text_channel(ctx, name: str, challenger: discord.User, challenged: discord.User, leaderboard: str):
+    await ctx.response.defer()
     # try:
     channel = await ctx.guild.create_text_channel(name)
     await channel.set_permissions(ctx.guild.default_role, send_messages=False)
@@ -406,9 +473,9 @@ async def create_text_channel(ctx, name: str, challenger: discord.User, challeng
     for admin in admins:
         await channel.set_permissions(client.get_user(admin["id"]), send_messages=True)
     await channel.send(content=f"{challenger.mention} has challenged {challenged.mention} to a {leaderboard} match!")
-    await ctx.response.send_message(content="Channel created: " + channel.mention)
+    await ctx.followup.send(content="Channel created: " + channel.mention)
     # except Exception as e:
-    #     await ctx.response.send_message(content="Could not create channel.\nReason: " + str(e))
+    #     await ctx.followup.send(content="Could not create channel.\nReason: " + str(e))
 
 
 @tree.command(name="add-mod-user", description="Add Moderator User.", guild=discord.Object(id=config['guildId']))
@@ -425,6 +492,7 @@ async def create_text_channel(ctx, name: str, challenger: discord.User, challeng
     app_commands.Choice(name="Not Moderator", value=0)
 ])
 async def add_mod_user(ctx, user: discord.User, username: str, mw2: app_commands.Choice[int], bo2: app_commands.Choice[int], mwii: app_commands.Choice[int]):
+    await ctx.response.defer()
     leadebords = []
     if mw2.value == 1:
         leadebords.append("mw2")
@@ -443,33 +511,36 @@ async def add_mod_user(ctx, user: discord.User, username: str, mw2: app_commands
         moderationHistory=[],
     )
     dbService.addLeaderboardModerator(user)
-    await ctx.response.send_message(content="Added " + str(user) + " to the database.")
+    await ctx.followup.send(content="Added " + str(user) + " to the database.")
 
 
 @tree.command(name="get-mod-user", description="Get Moderator User.", guild=discord.Object(id=config['guildId']))
 async def get_mod_user(ctx, user: discord.User):
+    await ctx.response.defer()
     try:
         user = dbService.getLeaderboardModerator(user.id)
-        await ctx.response.send_message(content="Found " + str(user))
+        await ctx.followup.send(content="Found " + str(user))
     except Exception as e:
-        await ctx.response.send_message(content="Could not find user.")
+        await ctx.followup.send(content="Could not find user.")
 
 
 @tree.command(name="remove-mod-user", description="Remove Moderator User.", guild=discord.Object(id=config['guildId']))
 async def remove_mod_user(ctx, user: discord.User):
+    await ctx.response.defer()
     try:
         userString = dbService.removeLeaderboardModerator(user.id)
-        await ctx.response.send_message(content=userString)
+        await ctx.followup.send(content=userString)
     except Exception as e:
-        await ctx.response.send_message(content="Could not find user.")
+        await ctx.followup.send(content="Could not find user.")
 
 
 @tree.command(name="list-mod-users", description="List Moderator Users.", guild=discord.Object(id=config['guildId']))
 async def list_mod_users(ctx):
+    await ctx.response.defer()
     usersString = dbService.getLeaderboardModerators()
     if usersString != "":
-        await ctx.response.send_message(content=str(usersString))
+        await ctx.followup.send(content=str(usersString))
     else:
-        await ctx.response.send_message(content="Could not find any moderators.")
+        await ctx.followup.send(content="Could not find any moderators.")
 
 client.run(config['token'])
