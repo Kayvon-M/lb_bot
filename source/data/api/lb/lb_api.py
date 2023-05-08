@@ -1,7 +1,8 @@
 import datetime
 import json
+from source.core.utils.elo_utils import getNewRatings
 from source.core.utils.time_utils import dateTimeToDateStr, getNowAsStr
-from source.data.models.base_models import ChallengeModel, ChallengeModelFromJSON, LBUserModel, LBUserModelFromJSON
+from source.data.models.base_models import ChallengeModel, ChallengeModelFromJSON, ChallengeResultModel, LBUserModel, LBUserModelFromJSON
 
 from source.data.services.tinydb.tinydb_service import TinyDBService
 
@@ -189,11 +190,19 @@ class LBApi:
             removedChallenge = self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
                 userId, challengeId)
             if removedChallenge.challenger.id == userId:
+                user = self.dbService.getLeaderboardUserDataById(
+                    removedChallenge.challenged.id)
+                challengeToRemove = list(filter(lambda x: x["challenger"]["id"] == removedChallenge.challenger.id and x[
+                    "challenged"]["id"] == removedChallenge.challenged.id, user["pendingChallenges"]))[0]
                 self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
-                    removedChallenge.challenged.id, challengeId)
+                    removedChallenge.challenged.id, challengeToRemove["id"])
             else:
+                user = self.dbService.getLeaderboardUserDataById(
+                    removedChallenge.challenger.id)
+                challengeToRemove = list(filter(lambda x: x["challenger"]["id"] == removedChallenge.challenger.id and x[
+                    "challenged"]["id"] == removedChallenge.challenged.id, user["pendingChallenges"]))[0]
                 self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
-                    removedChallenge.challenger.id, challengeId)
+                    removedChallenge.challenger.id, challengeToRemove["id"])
             return "Removed " + str(removedChallenge) + " from " + str(removedChallenge.challenger.username) + "'s pending challenges."
         except IndexError:
             raise Exception("Invalid user ID or challenge ID.")
@@ -234,6 +243,8 @@ class LBApi:
             challenged["id"], challengedPendingChallenge[0]["id"])
         challengerPendingChallenge[0]["isAccepted"] = True
         challengedPendingChallenge[0]["isAccepted"] = True
+        # print(challengerPendingChallenge[0])
+        # print(challengedPendingChallenge[0])
         addedActiveChallengerChallenge = self.dbService.addChallengeToLeaderboardUserActiveChallenges(
             challenger["id"], challengerPendingChallenge[0])
         addedActiveChallengedChallenge = self.dbService.addChallengeToLeaderboardUserActiveChallenges(
@@ -261,3 +272,120 @@ class LBApi:
         removedChallengedChallenge = self.dbService.removeChallengeFromLeaderboardUserPendingChallenges(
             challenged.id, challengedPendingChallenge["id"])
         return "Declined challenge " + str(removedChallengerChallenge) + " from " + str(removedChallengerChallenge.challenger.username) + " to " + str(removedChallengerChallenge.challenged.username) + "."
+
+    def onChallengeCompleted(self, challenger, challenged, challengerWon):
+        challengerData = self.dbService.getLeaderboardUserDataById(
+            challenger.id)
+        challengedData = self.dbService.getLeaderboardUserDataById(
+            challenged.id)
+        challengerObj = LBUserModelFromJSON(
+            challengerData)
+        challengedObj = LBUserModelFromJSON(
+            challengedData)
+        challengerActiveChallenge = list(filter(
+            lambda x: x["challenged"]["id"] == challenged.id, challengerData["activeChallenges"]))[0]
+        challengedActiveChallenge = list(filter(
+            lambda x: x["challenger"]["id"] == challenger.id, challengedData["activeChallenges"]))[0]
+        if challengerWon:
+            challengerResult = ChallengeResultModel(
+                challenger=challenger, challenged=challenged, leaderboard=challengerActiveChallenge["leaderboard"], result="win", resultTime=getNowAsStr())
+            challengedResult = ChallengeResultModel(
+                challenger=challenger, challenged=challenged, leaderboard=challengerActiveChallenge["leaderboard"], result="loss", resultTime=getNowAsStr())
+            # print(challengerResult.toJSON())
+            self.dbService.addChallengeToLeaderboardUserChallengeHistory(
+                challenger.id, challengerResult.toJSON())
+            self.dbService.addChallengeToLeaderboardUserChallengeHistory(
+                challenged.id, challengedResult.toJSON())
+            if challengerActiveChallenge["leaderboard"] == "mw2":
+                challengerNewElo = getNewRatings(
+                    challenger.mw2Elo, challenged.mw2Elo, "win")
+                challengedNewElo = getNewRatings(
+                    challenged.mw2Elo, challenger.mw2Elo, "loss")
+                self.dbService.updateLeaderboardUserElo(
+                    challenger.id, "mw2", challengerNewElo)
+                self.dbService.updateLeaderboardUserElo(
+                    challenged.id, "mw2", challengedNewElo)
+                removedChallengerChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenger.id, challengerActiveChallenge["id"])
+                removedChallengedChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenged.id, challengedActiveChallenge["id"])
+                return "Completed challenge. " + str(challengerObj.username) + " " + str(challengerResult.result) + " " + str(challengedObj.username) + " in " + str(challengerActiveChallenge["leaderboard"]) + ". New Elo: " + str(challengerNewElo) + " " + str(challengedNewElo)
+            elif challengerActiveChallenge["leaderboard"] == "bo2":
+                challengerNewElo = getNewRatings(
+                    challenger.bo2Elo, challenged.bo2Elo, "win")
+                challengedNewElo = getNewRatings(
+                    challenged.bo2Elo, challenger.bo2Elo, "loss")
+                self.dbService.updateLeaderboardUserElo(
+                    challenger.id, "bo2", challengerNewElo)
+                self.dbService.updateLeaderboardUserElo(
+                    challenged.id, "bo2", challengedNewElo)
+                removedChallengerChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenger.id, challengerActiveChallenge["id"])
+                removedChallengedChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenged.id, challengedActiveChallenge["id"])
+                return "Completed challenge. " + str(challengerObj.username) + " " + str(challengerResult.result) + " " + str(challengedObj.username) + " in " + str(challengerActiveChallenge["leaderboard"]) + ". New Elo: " + str(challengerNewElo) + " " + str(challengedNewElo)
+            elif challengerActiveChallenge["leaderboard"] == "mwii":
+                challengerNewElo = getNewRatings(
+                    challenger.mwiiElo, challenged.mwiiElo, "win")
+                challengedNewElo = getNewRatings(
+                    challenged.mwiiElo, challenger.mwiiElo, "loss")
+                self.dbService.updateLeaderboardUserElo(
+                    challenger.id, "mwii", challengerNewElo)
+                self.dbService.updateLeaderboardUserElo(
+                    challenged.id, "mwii", challengedNewElo)
+                removedChallengerChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenger.id, challengerActiveChallenge["id"])
+                removedChallengedChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenged.id, challengedActiveChallenge["id"])
+                return "Completed challenge. " + str(challengerObj.username) + " " + str(challengerResult.result) + " " + str(challengedObj.username) + " in " + str(challengerActiveChallenge["leaderboard"]) + ". New Elo: " + str(challengerNewElo) + " " + str(challengedNewElo)
+        else:
+            challengerResult = ChallengeResultModel(
+                challenger=challenger, challenged=challenged, leaderboard=challengerActiveChallenge["leaderboard"], result="loss", resultTime=getNowAsStr())
+            challengedResult = ChallengeResultModel(
+                challenger=challenger, challenged=challenged, leaderboard=challengerActiveChallenge["leaderboard"], result="win", resultTime=getNowAsStr())
+            self.dbService.addChallengeToLeaderboardUserChallengeHistory(
+                challenger.id, challengerResult.toJSON())
+            self.dbService.addChallengeToLeaderboardUserChallengeHistory(
+                challenged.id, challengedResult.toJSON())
+            if challengerActiveChallenge["leaderboard"] == "mw2":
+                challengerNewElo = getNewRatings(
+                    challenger.mw2Elo, challenged.mw2Elo, "loss")
+                challengedNewElo = getNewRatings(
+                    challenged.mw2Elo, challenger.mw2Elo, "win")
+                self.dbService.updateLeaderboardUserElo(
+                    challenger.id, "mw2", challengerNewElo)
+                self.dbService.updateLeaderboardUserElo(
+                    challenged.id, "mw2", challengedNewElo)
+                removedChallengerChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenger.id, challengerActiveChallenge["id"])
+                removedChallengedChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenged.id, challengedActiveChallenge["id"])
+                return "Completed challenge. " + str(challengerObj.username) + " " + str(challengerResult.result) + " " + str(challengedObj.username) + " in " + str(challengerActiveChallenge["leaderboard"]) + ". New Elo: " + str(challengerNewElo) + " " + str(challengedNewElo)
+            elif challengerActiveChallenge["leaderboard"] == "bo2":
+                challengerNewElo = getNewRatings(
+                    challenger.bo2Elo, challenged.bo2Elo, "loss")
+                challengedNewElo = getNewRatings(
+                    challenged.bo2Elo, challenger.bo2Elo, "win")
+                self.dbService.updateLeaderboardUserElo(
+                    challenger.id, "bo2", challengerNewElo)
+                self.dbService.updateLeaderboardUserElo(
+                    challenged.id, "bo2", challengedNewElo)
+                removedChallengerChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenger.id, challengerActiveChallenge["id"])
+                removedChallengedChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenged.id, challengedActiveChallenge["id"])
+                return "Completed challenge. " + str(challengerObj.username) + " " + str(challengerResult.result) + " " + str(challengedObj.username) + " in " + str(challengerActiveChallenge["leaderboard"]) + ". New Elo: " + str(challengerNewElo) + " " + str(challengedNewElo)
+            elif challengerActiveChallenge["leaderboard"] == "mwii":
+                challengerNewElo = getNewRatings(
+                    challenger.mwiiElo, challenged.mwiiElo, "loss")
+                challengedNewElo = getNewRatings(
+                    challenged.mwiiElo, challenger.mwiiElo, "win")
+                self.dbService.updateLeaderboardUserElo(
+                    challenger.id, "mwii", challengerNewElo)
+                self.dbService.updateLeaderboardUserElo(
+                    challenged.id, "mwii", challengedNewElo)
+                removedChallengerChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenger.id, challengerActiveChallenge["id"])
+                removedChallengedChallenge = self.dbService.removeChallengeFromLeaderboardUserActiveChallenges(
+                    challenged.id, challengedActiveChallenge["id"])
+                return "Completed challenge. " + str(challengerObj.username) + " " + str(challengerResult.result) + " " + str(challengedObj.username) + " in " + str(challengerActiveChallenge["leaderboard"]) + ". New Elo: " + str(challengerNewElo) + " " + str(challengedNewElo)

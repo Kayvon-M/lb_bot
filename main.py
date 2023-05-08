@@ -336,8 +336,8 @@ async def on_reaction_add(reaction, user):
     # await ctx.response.defer()
     category = client.get_channel(config["challengeCategoryId"])
     channel = reaction.message.channel
-    challengerName = str(channel.name).split("-vs-")[0]
-    challengedName = str(channel.name).split("-vs-")[1]
+    challengerName = str(channel.name).split("🔴-vs-🔵")[0]
+    challengedName = str(channel.name).split("🔴-vs-🔵")[1]
     challengerUserData = dbService.getLeaderboardUserDataByUsername(
         challengerName)
     challengedUserData = dbService.getLeaderboardUserDataByUsername(
@@ -363,7 +363,9 @@ async def on_reaction_add(reaction, user):
                 challengedChallenge = list(filter(
                     lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
                 lbApi.acceptChallenge(challengerChallenge)
-                # lbApi.acceptChallenge(challengedChallenge)
+                whoWonReaction = await channel.send("Who won?")
+                await whoWonReaction.add_reaction("🔴")
+                await whoWonReaction.add_reaction("🔵")
             elif reaction.emoji == "❌":
                 await reaction.message.delete()
                 await channel.send("Challenge Declined!")
@@ -377,7 +379,72 @@ async def on_reaction_add(reaction, user):
                     lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
                 lbApi.declineChallenge(challengerChallenge)
                 # lbApi.declineChallenge(challengedChallenge)
-        elif user.id != client.user.id and user.id != challengedObj.id:
+            elif reaction.emoji == "🔴":
+                if reaction.count == 3:
+                    challengerChallenges = dbService.getLeaderboardUserActiveChallengesDataById(
+                        challengerObj.id)
+                    challengedChallenges = dbService.getLeaderboardUserActiveChallengesDataById(
+                        challengedObj.id)
+                    challengerChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                    challengedChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                    await channel.send("Challenger " + challengerName + " Won!")
+                    challengeResultStr = lbApi.onChallengeCompleted(
+                        challengerObj, challengedObj, True)
+                    print("Challenge Result String: " + challengeResultStr)
+                    await channel.send(challengeResultStr)
+            elif reaction.emoji == "🔵":
+                if reaction.count == 3:
+                    challengerChallenges = dbService.getLeaderboardUserActiveChallengesDataById(
+                        challengerObj.id)
+                    challengedChallenges = dbService.getLeaderboardUserActiveChallengesDataById(
+                        challengedObj.id)
+                    challengerChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                    challengedChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                    await channel.send("Challenged " + challengedName + " Won!")
+                    challengeResultStr = lbApi.onChallengeCompleted(
+                        challengerObj, challengedObj, False)
+                    print("Challenge Result String:" + challengeResultStr)
+                    await channel.send(challengeResultStr)
+        elif user.id != client.user.id and user.id == challengerObj.id:
+            if reaction.emoji == "✅":
+                await reaction.message.remove_reaction(reaction.emoji, user)
+            elif reaction.emoji == "❌":
+                await reaction.message.remove_reaction(reaction.emoji, user)
+            elif reaction.emoji == "🔴":
+                if reaction.count == 3:
+                    challengerChallenges = dbService.getLeaderboardUserActiveChallengesDataById(
+                        challengerObj.id)
+                    challengedChallenges = dbService.getLeaderboardUserActiveChallengesDataById(
+                        challengedObj.id)
+                    challengerChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                    challengedChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                    await channel.send("Challenger " + challengerName + " Won!")
+                    challengeResultStr = lbApi.onChallengeCompleted(
+                        challengerObj, challengedObj, True)
+                    print("Challenge Result String:" + challengeResultStr)
+                    await channel.send(challengeResultStr)
+            elif reaction.emoji == "🔵":
+                if reaction.count == 3:
+                    challengerChallenges = dbService.getLeaderboardUserActiveChallengesDataById(
+                        challengerObj.id)
+                    challengedChallenges = dbService.getLeaderboardUserActiveChallengesDataById(
+                        challengedObj.id)
+                    challengerChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                    challengedChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                    await channel.send("Challenged " + challengedName + " Won!")
+                    challengeResultStr = lbApi.onChallengeCompleted(
+                        challengerObj, challengedObj, False)
+                    print("Challenge Result String:" + challengeResultStr)
+                    await channel.send(challengeResultStr)
+        elif user.id != client.user.id and user.id != challengedObj.id and user.id != challengerObj.id:
             await reaction.message.remove_reaction(reaction.emoji, user)
     # except Exception as e:
     #     await channel.send("Could not find a challenge for " + str(user) + ".\nReason: " + str(e))
@@ -395,7 +462,7 @@ async def lb_challenge(ctx, challenged: discord.User, leaderboard: app_commands.
         challenge = lbApi.challengeLBUser(
             ctx.user.id, challenged.id, leaderboard.value)
         category = client.get_channel(config["challengeCategoryId"])
-        channel = await category.create_text_channel(str(challenge.challenger.username).lower() + "-vs-" + str(challenge.challenged.username).lower())
+        channel = await category.create_text_channel(str(challenge.challenger.username).lower() + "🔴-vs-🔵" + str(challenge.challenged.username).lower())
         await channel.set_permissions(ctx.guild.default_role, send_messages=False, add_reactions=False)
         await channel.set_permissions(ctx.user, send_messages=True, add_reactions=True)
         await channel.set_permissions(challenged, send_messages=True, add_reactions=True)
@@ -448,12 +515,12 @@ async def lb_rm_challenge(ctx, user: discord.User, cid: str):
 @tree.command(name="lb-rm-all-challenges", description="Remove all Challenges from a user's pending challenges.", guild=discord.Object(id=config['guildId']))
 async def lb_rm_all_challenges(ctx, user: discord.User):
     await ctx.response.defer()
-    try:
-        challenges = lbApi.removeAllChallengesFromLBUserPendingChallenges(
-            user.id)
-        await ctx.followup.send(content="Challenges removed: " + str(challenges))
-    except Exception as e:
-        await ctx.followup.send(content="Could not remove challenges.\nReason: " + str(e))
+    # try:
+    challenges = lbApi.removeAllChallengesFromLBUserPendingChallenges(
+        user.id)
+    await ctx.followup.send(content="Challenges removed: " + str(challenges))
+    # except Exception as e:
+    #     await ctx.followup.send(content="Could not remove challenges.\nReason: " + str(e))
 
 
 @tree.command(name="create-text-channel", description="Create a Text Channel.", guild=discord.Object(id=config['guildId']))

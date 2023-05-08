@@ -117,7 +117,7 @@ class TinyDBService:
             raise Exception("Invalid leaderboard")
         self.db.table(self.lbUsersTable).update(
             userString.toJSON(), Query().id == userId)
-        return "Updated " + str(userString) + " " + leaderboard + " elo to " + str(elo)
+        return "Updated " + str(userString) + " " + str(leaderboard) + " elo to " + str(elo)
 
     def getLeaderboardUsers(self):
         userStrings = []
@@ -248,15 +248,28 @@ class TinyDBService:
         return "Added " + str(challenge) + " to " + str(lbUser)
 
     def getLeaderboardUserActiveChallengesById(self, userId):
-        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
-        activeChallengesStr = ""
-        if len(user['activeChallenges']) == 0:
-            raise Exception("User does not have any active challenges")
-        else:
-            for challenge in user['activeChallenges']:
-                challengeObj = ChallengeModelFromJSON(challenge)
-                activeChallengesStr += str(challengeObj) + "\n"
-        return activeChallengesStr
+        try:
+            user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+            activeChallengesStr = ""
+            if len(user['activeChallenges']) == 0:
+                raise Exception("User does not have any active challenges")
+            else:
+                for challenge in user['activeChallenges']:
+                    challengeObj = ChallengeModelFromJSON(challenge)
+                    activeChallengesStr += str(challengeObj) + "\n"
+            return activeChallengesStr
+        except TypeError:
+            raise Exception("User does not exist")
+
+    def getLeaderboardUserActiveChallengesDataById(self, userId):
+        try:
+            user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+            if len(user['activeChallenges']) == 0:
+                raise Exception("User does not have any active challenges")
+            else:
+                return user['activeChallenges']
+        except TypeError:
+            raise Exception("User does not exist")
 
     def removeChallengeFromLeaderboardUserActiveChallenges(self, userId, challengeId):
         user = self.db.table(self.lbUsersTable).get(Query().id == userId)
@@ -269,10 +282,15 @@ class TinyDBService:
                 raise Exception(
                     "User does not have an active challenge with that id")
             challengeObj = ChallengeModelFromJSON(challenge)
+            otherPlayersId = challengeObj.challenger.id if userId == challengeObj.challenged.id else challengeObj.challenged.id
             self.db.table(self.lbUsersTable).update(
                 {'activeChallenges': list(filter(lambda x: x['id'] != challengeId, user['activeChallenges']))}, Query().id == userId)
             self.db.table(self.lbUsersTable).update(
                 {'lastActiveDate': getNowAsStr()}, Query().id == userId)
+            self.db.table(self.lbUsersTable).update(
+                {'activeChallenges': list(filter(lambda x: x['id'] != challengeId, user['activeChallenges']))}, Query().id == otherPlayersId)
+            self.db.table(self.lbUsersTable).update(
+                {'lastActiveDate': getNowAsStr()}, Query().id == otherPlayersId)
             user = self.db.table(self.lbUsersTable).get(Query().id == userId)
             lbUser = LBUserModel(
                 id=user['id'],
@@ -293,10 +311,11 @@ class TinyDBService:
             )
             return "Removed " + str(challengeObj) + " from " + str(lbUser)
 
-    def addChallengeToLeaderboardUserChallengeHistory(self, userId, challenge):
+    def addChallengeToLeaderboardUserChallengeHistory(self, userId, challengeResult):
         user = self.db.table(self.lbUsersTable).get(Query().id == userId)
         userChallengeHistory = user['challengeHistory']
-        userChallengeHistory.append(challenge)
+        print(challengeResult)
+        userChallengeHistory.append(challengeResult)
         self.db.table(self.lbUsersTable).update(
             {'challengeHistory': userChallengeHistory}, Query().id == userId)
         self.db.table(self.lbUsersTable).update(
@@ -319,7 +338,7 @@ class TinyDBService:
             challengeHistory=user['challengeHistory'],
             moderationHistory=user['moderationHistory'],
         )
-        return "Added " + str(challenge) + " to " + str(lbUser)
+        return "Added " + str(challengeResult) + " to " + str(lbUser)
 
     def removeChallengeFromLeaderbordUserChallengeHistory(self, userId, challengeId):
         user = self.db.table(self.lbUsersTable).get(Query().id == userId)
@@ -434,21 +453,21 @@ class TinyDBService:
 
     def getLeaderboardModerators(self):
         userStrings = []
-        # try:
-        for user in self.db.table(self.lbModeratorTable).all():
-            lbUserObj = LBModeratorModel(
-                id=user['id'],
-                username=user['username'],
-                isBanned=user['isBanned'],
-                isModerator=user['isModerator'],
-                leaderboards=user['leaderboards'],
-                joinDate=user['joinDate'],
-                lastActiveDate=user['lastActiveDate'],
-                moderationHistory=user['moderationHistory'],
-            )
-            userStrings.append(str(lbUserObj))
-        # except:
-        #     pass
+        try:
+            for user in self.db.table(self.lbModeratorTable).all():
+                lbUserObj = LBModeratorModel(
+                    id=user['id'],
+                    username=user['username'],
+                    isBanned=user['isBanned'],
+                    isModerator=user['isModerator'],
+                    leaderboards=user['leaderboards'],
+                    joinDate=user['joinDate'],
+                    lastActiveDate=user['lastActiveDate'],
+                    moderationHistory=user['moderationHistory'],
+                )
+                userStrings.append(str(lbUserObj))
+        except:
+            pass
         return ",\n".join(userStrings)
 
     def getLeaderboardModeratorsData(self):

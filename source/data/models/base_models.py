@@ -50,11 +50,34 @@ class LBUserModel(BaseUserModel):
     def __repr__(self):
         return "User: " + self.username + " with ID " + str(self.id) + " joined on " + self.joinDate + " and last active on " + self.lastActiveDate + " and has stats on " + ", ".join(self.leaderboards)
 
-    def getUserStats(self, leaderboard):
-        if leaderboard in self.leaderboards:
-            return self.lbStats[leaderboard]
+    def getUserWins(self, leaderboard):
+        return len(list(filter(lambda x: x["result"]["result"] == "win" and x["leaderboard"] == leaderboard, self.matchHistory)))
+
+    def getUserLosses(self, leaderboard):
+        return len(list(filter(lambda x: x["result"]["result"] == "loss" and x["leaderboard"] == leaderboard, self.matchHistory)))
+
+    def getUserDraws(self, leaderboard):
+        return len(list(filter(lambda x: x["result"]["result"] == "draw" and x["leaderboard"] == leaderboard, self.matchHistory)))
+
+    def getUserElo(self, leaderboard):
+        if leaderboard == Leaderboards["mw2"]:
+            return self.mw2Elo
+        elif leaderboard == Leaderboards["bo2"]:
+            return self.bo2Elo
+        elif leaderboard == Leaderboards["mwii"]:
+            return self.mwiiElo
         else:
             return None
+
+    def getUserWinLossRatio(self, leaderboard):
+        wins = self.getUserWins(leaderboard)
+        losses = self.getUserLosses(leaderboard)
+        if losses == 0:
+            return wins
+        elif wins == 0:
+            return -losses
+        else:
+            return wins / losses
 
     def toJSON(self):
         return {
@@ -69,7 +92,7 @@ class LBUserModel(BaseUserModel):
             "bo2Elo": self.bo2Elo,
             "mwiiElo": self.mwiiElo,
             "matchHistory": self.matchHistory,
-            "activeChallenges": self.activeChallenges,
+            "activeChallenges": list(map(lambda x: x.toJSON(), self.activeChallenges)),
             "pendingChallenges": self.pendingChallenges,
             "challengeHistory": self.challengeHistory,
             "moderationHistory": self.moderationHistory,
@@ -104,6 +127,15 @@ class ModerationActionModel(object):
 
     def __repr__(self):
         return "Moderation action: " + self.moderator + " " + self.action + " " + self.target + " at " + self.actionTime
+
+    def toJSON(self):
+        return {
+            "action": self.action,
+            "moderator": self.moderator.toJSON(),
+            "target": self.target.toJSON(),
+            "reason": self.reason,
+            "actionTime": self.actionTime,
+        }
 
 
 class LBModeratorModel(BaseUserModel):
@@ -154,15 +186,15 @@ class ChallengeResultModel(object):
         self.resultTime = resultTime
 
     def __str__(self):
-        return "Challenge result: " + self.challenger + " challenged " + self.challenged + " on " + self.leaderboard + " and the result was " + self.result + " at " + self.resultTime
+        return "Challenge result: " + str(self.challenger) + " challenged " + str(self.challenged) + " on " + str(self.leaderboard) + " and the result was " + str(self.result) + " at " + str(self.resultTime)
 
     def __repr__(self):
-        return "Challenge result: " + self.challenger + " challenged " + self.challenged + " on " + self.leaderboard + " and the result was " + self.result + " at " + self.resultTime
+        return "Challenge result: " + str(self.challenger) + " challenged " + str(self.challenged) + " on " + str(self.leaderboard) + " and the result was " + str(self.result) + " at " + str(self.resultTime)
 
     def toJSON(self):
         return {
-            "challenger": LBUserModel(self.challenger).toJSON(),
-            "challenged": LBUserModel(self.challenged).toJSON(),
+            "challenger": self.challenger.toJSON(),
+            "challenged": self.challenged.toJSON(),
             "leaderboard": self.leaderboard,
             "result": self.result,
             "resultTime": self.resultTime
