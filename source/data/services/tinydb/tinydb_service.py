@@ -4,7 +4,7 @@ import discord
 from tinydb import TinyDB, Query
 from source.core.utils.time_utils import getNowAsStr
 
-from source.data.models.base_models import ChallengeModel, ChallengeModelFromJSON, LBModeratorModel, LBUserModel
+from source.data.models.base_models import ChallengeModel, ChallengeModelFromJSON, ChallengeResultModelFromJSON, LBModeratorModel, LBUserModel, LBUserModelFromJSON
 
 
 class TinyDBService:
@@ -90,23 +90,7 @@ class TinyDBService:
     def updateLeaderboardUserElo(self, userId, leaderboard, elo):
         user = self.db.table(self.lbUsersTable).get(
             Query().id == userId)
-        userString = LBUserModel(
-            id=user['id'],
-            username=user['username'],
-            isBanned=user['isBanned'],
-            isModerator=user['isModerator'],
-            leaderboards=user['leaderboards'],
-            joinDate=user['joinDate'],
-            lastActiveDate=user['lastActiveDate'],
-            mw2Elo=user['mw2Elo'],
-            bo2Elo=user['bo2Elo'],
-            mwiiElo=user['mwiiElo'],
-            matchHistory=user['matchHistory'],
-            activeChallenges=user['activeChallenges'],
-            pendingChallenges=user['pendingChallenges'],
-            challengeHistory=user['challengeHistory'],
-            moderationHistory=user['moderationHistory'],
-        )
+        userString = LBUserModelFromJSON(user)
         if leaderboard == 'mw2':
             userString.mw2Elo = elo
         elif leaderboard == 'bo2':
@@ -116,7 +100,7 @@ class TinyDBService:
         else:
             raise Exception("Invalid leaderboard")
         self.db.table(self.lbUsersTable).update(
-            userString.toJSON(), Query().id == userId)
+            {'mw2Elo': userString.mw2Elo, 'bo2Elo': userString.bo2Elo, 'mwiiElo': userString.mwiiElo}, Query().id == userId)
         return "Updated " + str(userString) + " " + str(leaderboard) + " elo to " + str(elo)
 
     def getLeaderboardUsers(self):
@@ -314,7 +298,7 @@ class TinyDBService:
     def addChallengeToLeaderboardUserChallengeHistory(self, userId, challengeResult):
         user = self.db.table(self.lbUsersTable).get(Query().id == userId)
         userChallengeHistory = user['challengeHistory']
-        print(challengeResult)
+        # print(challengeResult)
         userChallengeHistory.append(challengeResult)
         self.db.table(self.lbUsersTable).update(
             {'challengeHistory': userChallengeHistory}, Query().id == userId)
@@ -339,6 +323,18 @@ class TinyDBService:
             moderationHistory=user['moderationHistory'],
         )
         return "Added " + str(challengeResult) + " to " + str(lbUser)
+    
+    def getLeaderboardUserChallengeHistoryById(self, userId):
+        user = self.db.table(self.lbUsersTable).get(Query().id == userId)
+        userChallengeHistory = user['challengeHistory']
+        challengeHistoryStr = ""
+        if len(userChallengeHistory) == 0:
+            raise Exception("User does not have any challenge history")
+        else:
+            for challenge in userChallengeHistory:
+                challengeObj = ChallengeResultModelFromJSON(challenge)
+                challengeHistoryStr += str(challengeObj) + "\n"
+        return challengeHistoryStr
 
     def removeChallengeFromLeaderbordUserChallengeHistory(self, userId, challengeId):
         user = self.db.table(self.lbUsersTable).get(Query().id == userId)
@@ -348,7 +344,7 @@ class TinyDBService:
         if challenge is None:
             raise Exception(
                 "User does not have a challenge with that id in their history")
-        challengeObj = ChallengeModelFromJSON(challenge)
+        challengeObj = ChallengeResultModelFromJSON(challenge)
         userChallengeHistory.remove(challenge)
         self.db.table(self.lbUsersTable).update(
             {'challengeHistory': userChallengeHistory}, Query().id == userId)

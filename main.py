@@ -1,11 +1,14 @@
 import datetime
+import random
 import discord
 import json
 
 from discord import app_commands
+# from discord.ext import commands
 
 from source.core.utils.elo_utils import getNewRatings
 from source.data.api.lb.lb_api import LBApi
+# from source.data.api.lb.queue_api import QueueApi, setup
 from source.data.models.base_models import ChallengeModel, LBModeratorModel, LBUserModel, LBUserModelFromJSON
 from source.data.services.tinydb.tinydb_service import TinyDBService
 from source.core.utils.time_utils import getNowAsStr
@@ -392,7 +395,7 @@ async def on_reaction_add(reaction, user):
                     await channel.send("Challenger " + challengerName + " Won!")
                     challengeResultStr = lbApi.onChallengeCompleted(
                         challengerObj, challengedObj, True)
-                    print("Challenge Result String: " + challengeResultStr)
+                    # print("Challenge Result String: " + challengeResultStr)
                     await channel.send(challengeResultStr)
             elif reaction.emoji == "🔵":
                 if reaction.count == 3:
@@ -407,7 +410,7 @@ async def on_reaction_add(reaction, user):
                     await channel.send("Challenged " + challengedName + " Won!")
                     challengeResultStr = lbApi.onChallengeCompleted(
                         challengerObj, challengedObj, False)
-                    print("Challenge Result String:" + challengeResultStr)
+                    # print("Challenge Result String:" + challengeResultStr)
                     await channel.send(challengeResultStr)
         elif user.id != client.user.id and user.id == challengerObj.id:
             if reaction.emoji == "✅":
@@ -427,7 +430,7 @@ async def on_reaction_add(reaction, user):
                     await channel.send("Challenger " + challengerName + " Won!")
                     challengeResultStr = lbApi.onChallengeCompleted(
                         challengerObj, challengedObj, True)
-                    print("Challenge Result String:" + challengeResultStr)
+                    # print("Challenge Result String:" + challengeResultStr)
                     await channel.send(challengeResultStr)
             elif reaction.emoji == "🔵":
                 if reaction.count == 3:
@@ -442,7 +445,7 @@ async def on_reaction_add(reaction, user):
                     await channel.send("Challenged " + challengedName + " Won!")
                     challengeResultStr = lbApi.onChallengeCompleted(
                         challengerObj, challengedObj, False)
-                    print("Challenge Result String:" + challengeResultStr)
+                    # print("Challenge Result String:" + challengeResultStr)
                     await channel.send(challengeResultStr)
         elif user.id != client.user.id and user.id != challengedObj.id and user.id != challengerObj.id:
             await reaction.message.remove_reaction(reaction.emoji, user)
@@ -498,6 +501,28 @@ async def get_lb_user_active(ctx, user: discord.User):
         await ctx.followup.send(content="Found:\n" + str(activeChallenges))
     except Exception as e:
         await ctx.followup.send(content="Could not find any active challenges for " + str(user) + ".\nReason: " + str(e))
+
+
+@tree.command(name="get-lb-user-challenge-history", description="Get a user's challenge history.", guild=discord.Object(id=config['guildId']))
+async def get_lb_user_challenge_history(ctx, user: discord.User):
+    await ctx.response.defer()
+    try:
+        challengeHistory = dbService.getLeaderboardUserChallengeHistoryById(
+            user.id)
+        await ctx.followup.send(content="Found:\n" + str(challengeHistory))
+    except Exception as e:
+        await ctx.followup.send(content="Could not find any challenge history for " + str(user) + ".\nReason: " + str(e))
+
+
+@tree.command(name="rm-lb-user-challenge-history", description="Remove a challenge from a user's challenge history.", guild=discord.Object(id=config['guildId']))
+async def rm_lb_user_challenge_history(ctx, user: discord.User, cid: str):
+    await ctx.response.defer()
+    try:
+        removedStr = dbService.removeChallengeFromLeaderboardUserChallengeHistory(
+            user.id, int(cid))
+        await ctx.followup.send(content=removedStr)
+    except Exception as e:
+        await ctx.followup.send(content="Could not remove challenge.\nReason: " + str(e))
 
 
 @tree.command(name="lb-rm-challenge", description="Remove a Challenge from a user's pending challenges.", guild=discord.Object(id=config['guildId']))
@@ -609,5 +634,167 @@ async def list_mod_users(ctx):
         await ctx.followup.send(content=str(usersString))
     else:
         await ctx.followup.send(content="Could not find any moderators.")
+
+
+client = client
+qcount = 0
+team1 = []
+team2 = []
+total = []
+mention = []
+max_players = 2
+
+@tree.command(name='queue', description='Queue for a game', guild=discord.Object(id=config['guildId']))
+@app_commands.choices(team=[
+    app_commands.Choice(name='Team 1', value='team1'),
+    app_commands.Choice(name='Team 2', value='team2')
+])
+async def queue(ctx, team: str):
+    global qcount
+    global team1
+    global team2
+    global total
+    global max_players
+    await ctx.response.defer()
+    if qcount < max_players:
+        if team == 'team1' and len(team1) < max_players/2:
+            team1.append(ctx.user)
+            total.append(ctx.user)
+            qcount += 1
+            # await ctx.followup.send(f'{ctx.user.mention} has joined Team 1')
+        elif team == 'team2' and len(team2) < max_players/2:
+            team2.append(ctx.user)
+            total.append(ctx.user)
+            qcount += 1
+            # await ctx.followup.send(f'{ctx.user.mention} has joined Team 2')
+        else:
+            await ctx.followup.send('Invalid team or team is full')
+            return
+        if qcount != max_players:
+            await ctx.followup.send(f'{ctx.user.mention} has joined {team}')
+        else:
+            hostOfGame = random.choice(total)
+            password = random.randint(1000, 9999)
+            await ctx.channel.send(f'{hostOfGame.mention} is the host of the game')
+            await ctx.channel.send(f'Team 1: {list(map(lambda x: x.mention, team1))}')
+            await ctx.channel.send(f'Team 2: {list(map(lambda x: x.mention, team2))}')
+            HostEmbed = discord.Embed(
+                title = f'{max_players}Mans',
+                description = 'You\'re the host so create the lobby and let the other team know once the lobby is up.\n ' + '**Lobby Name:**  OU' + hostOfGame.name + '\n' + '**Password:** OU' + str(password),
+                colour = discord.Colour.green()
+            )
+            Team1Embed = discord.Embed(
+                title = f'{max_players}Mans',
+                description = '**Host:** ' + f'{hostOfGame.name}\n' + 'You\'re on the blue team, please keep an eye on the 6mans channel for an update from the host as to when the lobby is up.\n' + '**Lobby Name:** OU ' + hostOfGame.name + '\n' + '**Password:** OU' + str(password),
+                colour = discord.Colour.blue()
+            )
+            Team2Embed = discord.Embed(
+                title = f'{max_players}Mans',
+                description = '**Host:** ' + f'{hostOfGame.name}\n' + 'You\'re on the orange team, please keep an eye on the 6mans channel for an update from the host as to when the lobby is up.\n' + '**Lobby Name:** OU ' + hostOfGame.name + '\n' + '**Password:** OU' + str(password),
+                colour = discord.Colour.orange()
+            )
+            for p in team1:
+                await p.send(embed=Team1Embed)
+            for p in team2:
+                await p.send(embed=Team2Embed)
+            await hostOfGame.send(embed=HostEmbed)
+            overwrites = {
+                ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                ctx.guild.me: discord.PermissionOverwrite(read_messages=True)
+            }
+            team1VC = await ctx.guild.create_voice_channel('Team 1', overwrites=overwrites)
+            team2VC = await ctx.guild.create_voice_channel('Team 2', overwrites=overwrites)
+            await team1VC.set_permissions(ctx.guild.default_role, connect=False)
+            await team2VC.set_permissions(ctx.guild.default_role, connect=False)
+            await team1VC.set_permissions(ctx.guild.me, connect=True)
+            await team2VC.set_permissions(ctx.guild.me, connect=True)
+            for p in team1:
+                await team1VC.set_permissions(p, connect=True)
+            for p in team2:
+                await team2VC.set_permissions(p, connect=True)
+            await ctx.channel.send(f'{team1VC.mention} and {team2VC.mention} have been created')
+            await ctx.channel.send(f'**Lobby Name:** OU {hostOfGame.name}\n' + f'**Password:** OU {password}')
+            qcount = 0
+            team1 = []
+            team2 = []
+            total = []
+            mention = []
+            await ctx.followup.send('Start the game!')
+    else:
+        await ctx.followup.send('Queue is full')
+    
+@tree.command(name='leave', description='Leave the queue', guild=discord.Object(id=config['guildId']))
+async def leave(ctx):
+    global qcount
+    global team1
+    global team2
+    global total
+    global max_players
+    await ctx.response.defer()
+    if ctx.user in team1:
+        team1.remove(ctx.user)
+        total.remove(ctx.user)
+        qcount -= 1
+        await ctx.followup.send(f'{ctx.user.mention} has left the queue')
+    elif ctx.user in team2:
+        team2.remove(ctx.user)
+        total.remove(ctx.user)
+        qcount -= 1
+        await ctx.followup.send(f'{ctx.user.mention} has left the queue')
+    else:
+        await ctx.followup.send('You\'re not in the queue')
+
+@tree.command(name='status', description='Check the status of the queue', guild=discord.Object(id=config['guildId']))
+async def status(ctx):
+    global qcount
+    global team1
+    global team2
+    global total
+    global max_players
+    await ctx.response.defer()
+    StatusEmbed = discord.Embed(
+        title = f'{qcount}/{max_players}',
+        description = f'Team 1: {list(map(lambda x: x.mention, team1))}\nTeam 2: {list(map(lambda x: x.mention, team2))} \nTotal: {list(map(lambda x: x.mention, total))}',
+        colour = discord.Colour.blue()
+    )
+    await ctx.followup.send(embed=StatusEmbed)
+
+@tree.command(name='remove', description='Remove a player from the queue', guild=discord.Object(id=config['guildId']))
+async def remove(ctx, member: discord.Member):
+    global qcount
+    global team1
+    global team2
+    global total
+    global max_players
+    await ctx.response.defer()
+    if member in team1:
+        team1.remove(member)
+        total.remove(member)
+        qcount -= 1
+        await ctx.followup.send(f'{member.mention} has been removed from the queue')
+    elif member in team2:
+        team2.remove(member)
+        total.remove(member)
+        qcount -= 1
+        await ctx.followup.send(f'{member.mention} has been removed from the queue')
+    else:
+        await ctx.followup.send('That player is not in the queue')
+
+@tree.command(name='clear', description='Clear the queue', guild=discord.Object(id=config['guildId']))
+async def clear(ctx):
+    global qcount
+    global team1
+    global team2
+    global total
+    global max_players
+    await ctx.response.defer()
+    team1 = []
+    team2 = []
+    total = []
+    qcount = 0
+    await ctx.followup.send('Queue has been cleared')
+
+
+# setup(client)
 
 client.run(config['token'])
