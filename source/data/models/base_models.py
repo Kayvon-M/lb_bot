@@ -91,11 +91,11 @@ class LBUserModel(BaseUserModel):
             "mw2Elo": self.mw2Elo,
             "bo2Elo": self.bo2Elo,
             "mwiiElo": self.mwiiElo,
-            "matchHistory": list(map(lambda x: x.toJSON(), self.matchHistory)),
-            "activeChallenges": list(map(lambda x: x.toJSON(), self.activeChallenges)),
-            "pendingChallenges": list(map(lambda x: x.toJSON(), self.pendingChallenges)),
-            "challengeHistory": list(map(lambda x: x.toJSON(), self.challengeHistory)),
-            "moderationHistory": list(map(lambda x: x.toJSON(), self.moderationHistory)),
+            "matchHistory": list(map(lambda x: x.toJSON() if type(x) == ChallengeModel else x, self.matchHistory)),
+            "activeChallenges": list(map(lambda x: x.toJSON() if type(x) == ChallengeModel else x, self.activeChallenges)),
+            "pendingChallenges": list(map(lambda x: x.toJSON() if type(x) == ChallengeModel else x, self.pendingChallenges)),
+            "challengeHistory": list(map(lambda x: x.toJSON() if type(x) == ChallengeResultModel else x, self.challengeHistory)),
+            "moderationHistory": list(map(lambda x: x.toJSON() if type(x) == ModerationActionModel else x, self.moderationHistory)),
         }
 
 
@@ -131,8 +131,8 @@ class ModerationActionModel(object):
     def toJSON(self):
         return {
             "action": self.action,
-            "moderator": self.moderator.toJSON(),
-            "target": self.target.toJSON(),
+            "moderator": self.moderator.toJSON() if type(self.moderator) == LBModeratorModel else self.moderator,
+            "target": self.target.toJSON() if type(self.target) == LBUserModel else self.target,
             "reason": self.reason,
             "actionTime": self.actionTime,
         }
@@ -162,11 +162,8 @@ class LBModeratorModel(BaseUserModel):
             "leaderboards": self.leaderboards,
             "joinDate": self.joinDate,
             "lastActiveDate": self.lastActiveDate,
-            "moderationHistory": list(map(lambda x: x.toJSON(), self.moderationHistory)),
+            "moderationHistory": list(map(lambda x: x.toJSON() if type(x) == ModerationActionModel else x, self.moderationHistory)),
         }
-
-    def fromJSON(self, json):
-        return LBModeratorModel(json["id"], json["username"], json["isBanned"], json["isModerator"], json["leaderboards"], json["joinDate"], json["lastActiveDate"], json["moderationHistory"])
 
 
 ChallengePossibleOutcomes = {
@@ -178,7 +175,8 @@ ChallengePossibleOutcomes = {
 
 
 class ChallengeResultModel(object):
-    def __init__(self, challenger, challenged, leaderboard, result, resultTime):
+    def __init__(self, id, challenger, challenged, leaderboard, result, resultTime):
+        self.id = id
         self.challenger = challenger
         self.challenged = challenged
         self.leaderboard = leaderboard
@@ -186,15 +184,16 @@ class ChallengeResultModel(object):
         self.resultTime = resultTime
 
     def __str__(self):
-        return "Challenge result: " + str(LBUserModelFromJSON(self.challenger)) + " challenged " + str(LBUserModelFromJSON(self.challenged)) + " on " + str(self.leaderboard) + " and the result was " + str(self.result) + " at " + str(self.resultTime)
+        return "Challenge result with id " + str(id) + ": " + str(LBUserModelFromJSON(self.challenger)) + " challenged " + str(LBUserModelFromJSON(self.challenged)) + " on " + str(self.leaderboard) + " and the result was " + str(self.result) + " at " + str(self.resultTime)
 
     def __repr__(self):
-        return "Challenge result: " + str(LBUserModelFromJSON(self.challenger)) + " challenged " + str(LBUserModelFromJSON(self.challenged)) + " on " + str(self.leaderboard) + " and the result was " + str(self.result) + " at " + str(self.resultTime)
+        return "Challenge result with id " + str(id) + ": " + str(LBUserModelFromJSON(self.challenger)) + " challenged " + str(LBUserModelFromJSON(self.challenged)) + " on " + str(self.leaderboard) + " and the result was " + str(self.result) + " at " + str(self.resultTime)
 
     def toJSON(self):
         return {
-            "challenger": self.challenger.toJSON(),
-            "challenged": self.challenged.toJSON(),
+            "id": self.id,
+            "challenger": self.challenger.toJSON() if type(self.challenger) == LBUserModel else self.challenger,
+            "challenged": self.challenged.toJSON() if type(self.challenged) == LBUserModel else self.challenged,
             "leaderboard": self.leaderboard,
             "result": self.result,
             "resultTime": self.resultTime
@@ -256,13 +255,13 @@ class ChallengeModel(object):
         return {
             "id": self.id,
             "challengeTime": self.challengeTime,
-            "challenger": self.challenger.toJSON(),
-            "challenged": self.challenged.toJSON(),
+            "challenger": self.challenger.toJSON() if type(self.challenger) == LBUserModel else self.challenger,
+            "challenged": self.challenged.toJSON() if type(self.challenged) == LBUserModel else self.challenged,
             "leaderboard": self.leaderboard,
             "isAccepted": self.isAccepted,
             "isMandatory": self.isMandatory,
             "expiryTime": self.expiryTime,
-            "result": None if self.result is None else self.result.toJSON()
+            "result": None if self.result is None else self.result.toJSON() if type(self.result) == ChallengeResultModel else self.result
         }
 
 
@@ -278,6 +277,7 @@ def ModerationActionModelFromJSON(json):
 
 def ChallengeResultModelFromJSON(json):
     return ChallengeResultModel(
+        json["id"],
         json["challenger"],
         json["challenged"],
         json["leaderboard"],
@@ -308,6 +308,20 @@ def LBUserModelFromJSON(json):
             lambda x: ChallengeResultModelFromJSON(x), json["challengeHistory"])),
         list(map(
             lambda x: ModerationActionModelFromJSON(x), json["moderationHistory"]))
+    )
+
+
+def LBModeratorModelFromJSON(json):
+    return LBModeratorModel(
+        json["id"],
+        json["username"],
+        json["isBanned"],
+        json["isModerator"],
+        json["leaderboards"],
+        json["joinDate"],
+        json["lastActiveDate"],
+        list(map(
+            lambda x: ModerationActionModelFromJSON(x), json["matchHistory"]))
     )
 
 
