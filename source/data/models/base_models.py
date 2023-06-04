@@ -265,6 +265,48 @@ class ChallengeModel(object):
         }
 
 
+class ScheduledActionModel(object):
+    def __init__(self, actionType, actionId, actionTime):
+        self.actionType = actionType
+        self.actionId = actionId
+        self.actionTime = actionTime
+
+    def __str__(self):
+        return f"Scheduled action of type {self.actionType} with id {self.actionId} at {self.actionTime}"
+
+    def __repr__(self):
+        return f"Scheduled action of type {self.actionType} with id {self.actionId} at {self.actionTime}"
+
+    def toJSON(self):
+        return {
+            "actionType": self.actionType,
+            "actionId": self.actionId,
+            "actionTime": self.actionTime
+        }
+
+
+class PendingChallengeScheduledActionGroupModel(object):
+    def __init__(self, challengeName, challengerId, challengedId, actions):
+        self.challengeName = challengeName
+        self.challengerId = challengerId
+        self.challengedId = challengedId
+        self.actions = actions
+
+    def __str__(self):
+        return f"Pending challenge scheduled action for {self.challengeName} between {self.challengerId} and {self.challengedId} with {len(self.actions)} actions"
+
+    def __repr__(self):
+        return f"Pending challenge scheduled action for {self.challengeName} between {self.challengerId} and {self.challengedId} with {len(self.actions)} actions"
+
+    def toJSON(self):
+        return {
+            "challengeName": self.challengeName,
+            "challengerId": self.challengerId,
+            "challengedId": self.challengedId,
+            "actions": list(map(lambda x: x.toJSON(), self.actions))
+        }
+
+
 def ModerationActionModelFromJSON(json):
     return ModerationActionModel(
         json["action"],
@@ -335,5 +377,24 @@ def ChallengeModelFromJSON(json):
         json["isAccepted"],
         json["isMandatory"],
         json["expiryTime"],
-        None if json["result"] is None else ChallengeResultModelFromJSON(json["result"])
+        None if json["result"] is None else ChallengeResultModelFromJSON(
+            json["result"])
+    )
+
+
+def ScheduledActionModelFromJSON(json):
+    return ScheduledActionModel(
+        json["actionType"],
+        json["actionId"],
+        json["actionTime"]
+    )
+
+
+def PendingChallengeScheduledActionGroupModelFromJSON(json):
+    print(json)
+    return PendingChallengeScheduledActionGroupModel(
+        json["challengeName"],
+        json["challengerId"],
+        json["challengedId"],
+        list(map(lambda x: ScheduledActionModelFromJSON(x), json["actions"]))
     )

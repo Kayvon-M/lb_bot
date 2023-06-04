@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from source.core.utils.elo_utils import getNewRatings
 from source.data.api.lb.lb_api import LBApi
 # from source.data.api.lb.queue_api import QueueApi, setup
-from source.data.models.base_models import ChallengeModel, ChallengeModelFromJSON, LBModeratorModel, LBUserModel, LBUserModelFromJSON
+from source.data.models.base_models import ChallengeModel, ChallengeModelFromJSON, LBModeratorModel, LBUserModel, LBUserModelFromJSON, PendingChallengeScheduledActionGroupModel, PendingChallengeScheduledActionGroupModelFromJSON, ScheduledActionModel
 from source.data.services.mongodb.mongodb_service import MongoDBService
 # from source.data.services.scheduler.scheduler_service import SchedulerService
 from source.data.services.tinydb.tinydb_service import TinyDBService
@@ -41,7 +41,8 @@ def loop_in_thread(loop=None):
     loop.run_forever()
 
 def add_job(func, trigger, run_date=None, args=None):
-    scheduler.add_job(func, trigger, run_date=run_date, args=args)
+    job = scheduler.add_job(func, trigger, run_date=run_date, args=args)
+    return job
 
 def remove_job(job_id):
     scheduler.remove_job(job_id)
@@ -63,24 +64,37 @@ def clear():
 
 def run_after_1_min(func, args=None):
     run_date = datetime.now() + timedelta(minutes=1)
-    add_job(func, 'date', run_date=run_date, args=args)
+    return add_job(func, 'date', run_date=run_date, args=args)
 
 def delete_challenge_tc_job(func, args=None):
     run_date = datetime.now() + timedelta(minutes=1)
-    add_job(func, 'date', run_date=run_date)
+    return add_job(func, 'date', run_date=run_date)
 
-def message_user_about_challenge_job(funcOne, funcTwo, funcThree, argsOne=None, argsTwo=None, argsThree=None):
+def message_user_about_challenge_job(funcOne, funcTwo, funcThree, funcFour, argsOne=None, argsTwo=None, argsThree=None, argsFour=None):
     run_date = datetime.now() + timedelta(days=1)
-    add_job(funcOne, 'date', run_date=run_date, args=argsOne)
+    job_one = add_job(funcOne, 'date', run_date=run_date, args=argsOne)
     run_date = datetime.now() + timedelta(days=2)
-    add_job(funcTwo, 'date', run_date=run_date, args=argsTwo)
+    job_two = add_job(funcTwo, 'date', run_date=run_date, args=argsTwo)
     run_date = datetime.now() + timedelta(days=2, hours=23)
-    add_job(funcThree, 'date', run_date=run_date, args=argsThree)
+    job_three = add_job(funcThree, 'date', run_date=run_date, args=argsThree)
+    run_date = datetime.now()
+    job_four = add_job(funcFour, 'date', run_date=run_date, args=argsFour)
+    return job_one, job_two, job_three, job_four
 
 try:
     print(dbService.getAllLeaderboardUsersStrings())
 except Exception as e:
     print(e)
+
+
+async def delete_channel(channelId):
+    channel = client.get_channel(channelId)
+    asyncio.run_coroutine_threadsafe(channel.delete(), client.loop)
+
+
+async def message_user_about_pending_match(userId, challengerObj, challengedObj, time):
+    user = client.get_user(userId)
+    asyncio.run_coroutine_threadsafe(user.send(content="You have a pending match with " + challengerObj.username + " and " + challengedObj.username + " in " + str(time)), client.loop)
 
 
 @client.event
@@ -351,129 +365,211 @@ async def on_reaction_add(reaction, user):
     challengerName = str(channel.name).split("🔴-vs-🔵")[0]
     challengedName = str(channel.name).split("🔴-vs-🔵")[1]
     challengerUserData = dbService.getLeaderboardUserDataByName(
-        challengerName)
+        challengerName.replace("-", " "))
     challengedUserData = dbService.getLeaderboardUserDataByName(
-        challengedName)
+        challengedName.replace("-", " "))
     challengerObj = LBUserModelFromJSON(challengerUserData)
     challengedObj = LBUserModelFromJSON(challengedUserData)
     # challengerChallenge = list(filter(lambda x: x.challenger.id ==
     #                            challengerObj.id and x.challenged.id == challengedObj.id, challengerObj.pendingChallenges))[0]
     # challengedChallenge = list(filter(lambda x: x.challenger.id ==
     #    challengerObj.id and x.challenged.id == challengedObj.id, challengedObj.pendingChallenges))[0]
-    try:
-        if channel.category_id == category.id:
-            if user.id != client.user.id and user.id == challengedObj.id:
-                if reaction.emoji == "✅":
-                    await reaction.message.delete()
-                    await channel.send("Challenge Accepted!")
-                    challengerChallenges = dbService.getAllChallengeDataFromLeaderboardUserPendingChallengesById(
+    # try:
+    if channel.category_id == category.id:
+        if user.id != client.user.id and user.id == challengedObj.id:
+            if reaction.emoji == "✅":
+                await reaction.message.delete()
+                await channel.send("Challenge Accepted!")
+                challengerChallenges = dbService.getAllChallengeDataFromLeaderboardUserPendingChallengesById(
+                    challengerObj.id)
+                challengedChallenges = dbService.getAllChallengeDataFromLeaderboardUserPendingChallengesById(
+                    challengedObj.id)
+                challengerChallenge = list(filter(
+                    lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                challengedChallenge = list(filter(
+                    lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                lbApi.acceptChallenge(challengerChallenge)
+                whoWonReaction = await channel.send("Who won?")
+                await whoWonReaction.add_reaction("🔴")
+                await whoWonReaction.add_reaction("🔵")
+                message_user_jobs = message_user_about_challenge_job(
+                    message_user_about_pending_match,
+                    message_user_about_pending_match,
+                    message_user_about_pending_match,
+                    message_user_about_pending_match,
+                    [challengerObj.id, challengerObj, challengedObj, "2 days" ],
+                    [challengerObj.id, challengerObj, challengedObj, "1 days" ],
+                    [challengerObj.id, challengerObj, challengedObj, "1 hour" ],
+                    [challengerObj.id, challengerObj, challengedObj, "3 days" ],
+                )
+                scheduledActionGroupObj = None
+                try:
+                    scheduledActionGroup = dbService.getPendingChallengeScheduledActionGroupObjectFromLBUser(
+                        challengerObj.id, channel.name)
+                except Exception as e:
+                    pendingchallengeGroup = PendingChallengeScheduledActionGroupModel(
+                            challengeName=channel.name,
+                            challengerId=challengerObj.id,
+                            challengedId=challengedObj.id,
+                            actions=[]
+                        ).toJSON()
+                    dbService.addPendingChallengeScheduledActionGroupToLBUser(
+                        challengerObj.id, pendingchallengeGroup
+                    )
+                    scheduledActionGroup = dbService.getPendingChallengeScheduledActionGroupObjectFromLBUser(
+                        challengerObj.id, channel.name)
+                print(scheduledActionGroup)
+                actionsToAdd = []
+                for action in message_user_jobs:
+                    if action.id not in list(map(lambda x: x.id, scheduledActionGroup.actions)):
+                        actionsToAdd.append(
+                            ScheduledActionModel(
+                                actionType="message",
+                                actionId=action.id,
+                                actionTime=action.next_run_time
+                            ).toJSON()
+                        )
+                print(actionsToAdd)
+                if len(actionsToAdd) > 0:
+                    for action in actionsToAdd:
+                        dbService.addScheduledActionToLBUserPendingChallengeScheduledActionGroup(
+                            challengerObj.id, channel.name, action)
+                message_user_jobs = message_user_about_challenge_job(
+                    message_user_about_pending_match,
+                    message_user_about_pending_match,
+                    message_user_about_pending_match,
+                    message_user_about_pending_match,
+                    [challengedObj.id, challengerObj, challengedObj, "2 days" ],
+                    [challengedObj.id, challengerObj, challengedObj, "1 days" ],
+                    [challengedObj.id, challengerObj, challengedObj, "1 hour" ],
+                    [challengedObj.id, challengerObj, challengedObj, "3 days" ],
+                )
+                scheduledActionGroupObj = None
+                try:
+                    scheduledActionGroup = dbService.getPendingChallengeScheduledActionGroupObjectFromLBUser(
+                        challengedObj.id, channel.name)
+                except Exception as e:
+                    pendingchallengeGroup = PendingChallengeScheduledActionGroupModel(
+                            challengeName=channel.name,
+                            challengerId=challengerObj.id,
+                            challengedId=challengedObj.id,
+                            actions=[]
+                        ).toJSON()
+                    dbService.addPendingChallengeScheduledActionGroupToLBUser(
+                        challengedObj.id, pendingchallengeGroup
+                    )
+                    scheduledActionGroup = dbService.getPendingChallengeScheduledActionGroupObjectFromLBUser(
+                        challengedObj.id, channel.name)
+                actionsToAdd = []
+                for action in message_user_jobs:
+                    if action.id not in list(map(lambda x: x.id, scheduledActionGroup.actions)):
+                        actionsToAdd.append(
+                            ScheduledActionModel(
+                                actionType="message",
+                                actionId=action.id,
+                                actionTime=action.next_run_time
+                            ).toJSON()
+                        )
+                if len(actionsToAdd) > 0:
+                    for action in actionsToAdd:
+                        dbService.addScheduledActionToLBUserPendingChallengeScheduledActionGroup(
+                            challengedObj.id, channel.name, action)
+            elif reaction.emoji == "❌":
+                await reaction.message.delete()
+                await channel.send("Challenge Declined!")
+                challengerChallenges = dbService.getAllChallengeDataFromLeaderboardUserPendingChallengesById(
+                    challengerObj.id)
+                challengedChallenges = dbService.getAllChallengeDataFromLeaderboardUserPendingChallengesById(
+                    challengedObj.id)
+                challengerChallenge = list(filter(
+                    lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                challengedChallenge = list(filter(
+                    lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                lbApi.declineChallenge(challengerChallenge)
+                # lbApi.declineChallenge(challengedChallenge)
+            elif reaction.emoji == "🔴":
+                if reaction.count == 3:
+                    challengerChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
                         challengerObj.id)
-                    challengedChallenges = dbService.getAllChallengeDataFromLeaderboardUserPendingChallengesById(
+                    challengedChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
                         challengedObj.id)
                     challengerChallenge = list(filter(
                         lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
                     challengedChallenge = list(filter(
                         lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
-                    lbApi.acceptChallenge(challengerChallenge)
-                    whoWonReaction = await channel.send("Who won?")
-                    await whoWonReaction.add_reaction("🔴")
-                    await whoWonReaction.add_reaction("🔵")
-                elif reaction.emoji == "❌":
+                    await channel.send("Challenger " + challengerName + " Won!")
+                    challengeResultStr = lbApi.onChallengeCompleted(
+                        challengerObj, challengedObj, True)
+                    # print("Challenge Result String: " + challengeResultStr)
+                    await channel.send(challengeResultStr)
+                    await channel.send("Deleting channel in 1 minute...")
                     await reaction.message.delete()
-                    await channel.send("Challenge Declined!")
-                    challengerChallenges = dbService.getAllChallengeDataFromLeaderboardUserPendingChallengesById(
+                    run_after_1_min(delete_channel, [channel.id])
+            elif reaction.emoji == "🔵":
+                if reaction.count == 3:
+                    challengerChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
                         challengerObj.id)
-                    challengedChallenges = dbService.getAllChallengeDataFromLeaderboardUserPendingChallengesById(
+                    challengedChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
                         challengedObj.id)
                     challengerChallenge = list(filter(
                         lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
                     challengedChallenge = list(filter(
                         lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
-                    lbApi.declineChallenge(challengerChallenge)
-                    # lbApi.declineChallenge(challengedChallenge)
-                elif reaction.emoji == "🔴":
-                    if reaction.count == 3:
-                        challengerChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
-                            challengerObj.id)
-                        challengedChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
-                            challengedObj.id)
-                        challengerChallenge = list(filter(
-                            lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
-                        challengedChallenge = list(filter(
-                            lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
-                        await channel.send("Challenger " + challengerName + " Won!")
-                        challengeResultStr = lbApi.onChallengeCompleted(
-                            challengerObj, challengedObj, True)
-                        # print("Challenge Result String: " + challengeResultStr)
-                        await channel.send(challengeResultStr)
-                        await channel.send("Deleting channel in 1 minute...")
-                        await reaction.message.delete()
-                        delete_challenge_tc_job(channel.delete)
-                elif reaction.emoji == "🔵":
-                    if reaction.count == 3:
-                        challengerChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
-                            challengerObj.id)
-                        challengedChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
-                            challengedObj.id)
-                        challengerChallenge = list(filter(
-                            lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
-                        challengedChallenge = list(filter(
-                            lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
-                        await channel.send("Challenged " + challengedName + " Won!")
-                        challengeResultStr = lbApi.onChallengeCompleted(
-                            challengerObj, challengedObj, False)
-                        # print("Challenge Result String:" + challengeResultStr)
-                        await channel.send(challengeResultStr)
-                        await channel.send("Deleting channel in 1 minute...")
-                        await reaction.message.delete()
-                        delete_challenge_tc_job(channel.delete)
-            elif user.id != client.user.id and user.id == challengerObj.id:
-                if reaction.emoji == "✅":
-                    await reaction.message.remove_reaction(reaction.emoji, user)
-                elif reaction.emoji == "❌":
-                    await reaction.message.remove_reaction(reaction.emoji, user)
-                elif reaction.emoji == "🔴":
-                    if reaction.count == 3:
-                        challengerChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
-                            challengerObj.id)
-                        challengedChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
-                            challengedObj.id)
-                        challengerChallenge = list(filter(
-                            lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
-                        challengedChallenge = list(filter(
-                            lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
-                        await channel.send("Challenger " + challengerName + " Won!")
-                        challengeResultStr = lbApi.onChallengeCompleted(
-                            challengerObj, challengedObj, True)
-                        # print("Challenge Result String:" + challengeResultStr)
-                        await channel.send(challengeResultStr)
-                        await channel.send("Deleting channel in 1 minute...")
-                        await reaction.message.delete()
-                        delete_challenge_tc_job(channel.delete)
-                elif reaction.emoji == "🔵":
-                    if reaction.count == 3:
-                        challengerChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
-                            challengerObj.id)
-                        challengedChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
-                            challengedObj.id)
-                        challengerChallenge = list(filter(
-                            lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
-                        challengedChallenge = list(filter(
-                            lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
-                        await channel.send("Challenged " + challengedName + " Won!")
-                        challengeResultStr = lbApi.onChallengeCompleted(
-                            challengerObj, challengedObj, False)
-                        # print("Challenge Result String:" + challengeResultStr)
-                        await channel.send(challengeResultStr)
-                        await channel.send("Deleting channel in 1 minute...")
-                        await reaction.message.delete()
-                        delete_challenge_tc_job(channel.delete)
-            elif user.id != client.user.id and user.id != challengedObj.id and user.id != challengerObj.id:
+                    await channel.send("Challenged " + challengedName + " Won!")
+                    challengeResultStr = lbApi.onChallengeCompleted(
+                        challengerObj, challengedObj, False)
+                    # print("Challenge Result String:" + challengeResultStr)
+                    await channel.send(challengeResultStr)
+                    await channel.send("Deleting channel in 1 minute...")
+                    await reaction.message.delete()
+                    run_after_1_min(delete_channel, [channel.id])
+        elif user.id != client.user.id and user.id == challengerObj.id:
+            if reaction.emoji == "✅":
                 await reaction.message.remove_reaction(reaction.emoji, user)
-    except IndexError:
-        await channel.send("No challenge found, challenge completed, or challenge declined.")
-    except Exception as e:
-        await channel.send("Could not find a challenge for " + str(user) + ".\nReason: " + str(e))
+            elif reaction.emoji == "❌":
+                await reaction.message.remove_reaction(reaction.emoji, user)
+            elif reaction.emoji == "🔴":
+                if reaction.count == 3:
+                    challengerChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
+                        challengerObj.id)
+                    challengedChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
+                        challengedObj.id)
+                    challengerChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                    challengedChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                    await channel.send("Challenger " + challengerName + " Won!")
+                    challengeResultStr = lbApi.onChallengeCompleted(
+                        challengerObj, challengedObj, True)
+                    # print("Challenge Result String:" + challengeResultStr)
+                    await channel.send(challengeResultStr)
+                    await channel.send("Deleting channel in 1 minute...")
+                    await reaction.message.delete()
+                    run_after_1_min(delete_channel, [channel.id])
+            elif reaction.emoji == "🔵":
+                if reaction.count == 3:
+                    challengerChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
+                        challengerObj.id)
+                    challengedChallenges = dbService.getAllLeaderboardUserActiveChallengesDataById(
+                        challengedObj.id)
+                    challengerChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengerChallenges))[0]
+                    challengedChallenge = list(filter(
+                        lambda x: x["challenger"]["id"] == challengerObj.id and x["challenged"]["id"] == challengedObj.id, challengedChallenges))[0]
+                    await channel.send("Challenged " + challengedName + " Won!")
+                    challengeResultStr = lbApi.onChallengeCompleted(
+                        challengerObj, challengedObj, False)
+                    # print("Challenge Result String:" + challengeResultStr)
+                    await channel.send(challengeResultStr)
+                    await channel.send("Deleting channel in 1 minute...")
+                    await reaction.message.delete()
+                    run_after_1_min(delete_channel, [channel.id])
+        elif user.id != client.user.id and user.id != challengedObj.id and user.id != challengerObj.id:
+            await reaction.message.remove_reaction(reaction.emoji, user)
+    # except IndexError:
+    #     await channel.send("No challenge found, challenge completed, or challenge declined.")
+    # except Exception as e:
+    #     await channel.send("Could not find a challenge for " + str(user) + ".\nReason: " + str(e))
 
 
 @tree.command(name="lb-challenge", description="Challenge a Player from a Leaderboard.", guild=discord.Object(id=config['guildId']))
@@ -824,7 +920,7 @@ async def clear(ctx):
 # setup(client)
 
 scheduler.start()
-t = threading.Thread(target=loop_in_thread, args=(asyncio.get_event_loop(),))
+t = threading.Thread(target=loop_in_thread, args=(asyncio.get_event_loop(),), daemon=True)
 t.start()
 
 
